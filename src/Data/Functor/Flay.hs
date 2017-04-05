@@ -74,7 +74,7 @@ type Flay (c :: * -> Constraint) m s t f g
 --
 -- When defining 'Flayable' instances, you will usually leave @c@, @m@, @f@, and
 -- @g@ polymomrphic.
-class Flayable c m s t f g | s -> f, t -> g, s g -> t, t f -> s where
+class Applicative m => Flayable c m s t f g | s -> f, t -> g, s g -> t, t f -> s where
   flay :: Flay c m s t f g
   -- | If @s@ and @g@ are instances of 'G.Generic', then 'flay' gets a default
   -- implementation.
@@ -85,6 +85,10 @@ class Flayable c m s t f g | s -> f, t -> g, s g -> t, t f -> s where
   --
   -- instance ('Applicative' m, c 'Int', c 'Bool') => 'Flayable' c m (Foo f) (Foo g) f g
   -- @
+  --
+  -- Notice that while this default definition work for an @s@ having "nested
+  -- 'Flayables'", GHC will prompt you for some additional constraints related
+  -- to 'GFlay'' in that case.
   default flay :: GFlay c m s t f g => Flay c m s t f g
   flay = gflay
   {-# INLINE flay #-}
@@ -151,30 +155,29 @@ instance Applicative m => GFlay' c m G.V1 G.V1 f g where
   {-# INLINE gflay' #-}
 
 -- Is this OK? Necessary?
--- instance (Applicative m, GFlay' c m s t f g)
---   => GFlay' c m (G.Rec1 s) (G.Rec1 t) f g where
---   gflay' h (G.Rec1 sp) = G.Rec1 <$> gflay' h sp
---   {-# INLINE gflay' #-}
+instance GFlay' c m s t f g
+  => GFlay' c m (G.Rec1 s) (G.Rec1 t) f g where
+  gflay' h (G.Rec1 sp) = G.Rec1 <$> gflay' h sp
+  {-# INLINE gflay' #-}
 
-instance (Applicative m, c a) => GFlay' c m (G.K1 r (f a)) (G.K1 r (g a)) f g where
-  gflay' h (G.K1 fa) = G.K1 <$> h Dict fa
+instance (Flayable c m (f a) (g a) f g, c a) => GFlay' c m (G.K1 r (f a)) (G.K1 r (g a)) f g where
+  gflay' h (G.K1 fa) = G.K1 <$> flay h fa
   {-# INLINE gflay' #-}
 
 instance Applicative m => GFlay' c m (G.K1 r x) (G.K1 r x) f g where
   gflay' _ x = pure x
   {-# INLINE gflay' #-}
 
-instance (Applicative m, GFlay' c m s t f g)
-  => GFlay' c m (G.M1 i j s) (G.M1 i j t) f g where
+instance GFlay' c m s t f g => GFlay' c m (G.M1 i j s) (G.M1 i j t) f g where
   gflay' h (G.M1 sp) = G.M1 <$> gflay' h sp
   {-# INLINE gflay' #-}
 
-instance (Applicative m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
+instance (GFlay' c m sl tl f g, GFlay' c m sr tr f g)
   => GFlay' c m (sl G.:*: sr) (tl G.:*: tr) f g where
   gflay' h (slp G.:*: srp) = (G.:*:) <$> gflay' h slp <*> gflay' h srp
   {-# INLINE gflay' #-}
 
-instance (Applicative m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
+instance (GFlay' c m sl tl f g, GFlay' c m sr tr f g)
   => GFlay' c m (sl G.:+: sr) (tl G.:+: tr) f g where
   gflay' h x = case x of
     G.L1 slp -> G.L1 <$> gflay' h slp
