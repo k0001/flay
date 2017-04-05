@@ -1,0 +1,41 @@
+name: flay
+version: 0.1
+author: Renzo Carbonara
+maintainer: renλren!zone
+copyright: Renzo Carbonara 2017
+license: BSD3
+license-file: LICENSE.txt
+extra-source-files: README.md CHANGELOG.md
+category: Data
+build-type: Simple
+cabal-version: >=1.18
+synopsis: Work on your datatype without knowing much about it.
+description:
+  Work on your datatype without knowing much about it.
+  A mixture of traversals and natural transformations.
+homepage: https://github.com/k0001/flay
+bug-reports: https://github.com/k0001/flay/issues
+
+library
+  hs-source-dirs: src
+  default-language: Haskell2010
+  ghcjs-options: -Wall -O3
+  ghc-options: -Wall -O2
+  exposed-modules:
+    Data.Functor.Flay
+  build-depends:
+    base >=4.9 && <5.0,
+    constraints
+
+test-suite tests
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests
+  main-is: Main.hs
+  build-depends:
+    base,
+    flay,
+    tasty,
+    tasty-quickcheck
+
+
