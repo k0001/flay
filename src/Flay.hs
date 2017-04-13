@@ -9,7 +9,12 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Data.Functor.Flay
+-- |
+-- @
+-- import Flay (Flay, Flayable, flay)
+-- import qualified Flay
+-- @
+module Flay
  ( Flay
  -- * Flayable
  , Flayable(flay)

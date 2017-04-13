@@ -18,7 +18,7 @@ import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===))
 import qualified Test.Tasty.QuickCheck as QC
 
-import Data.Functor.Flay
+import Flay
 
 --------------------------------------------------------------------------------
 
