@@ -70,8 +70,8 @@ import qualified GHC.Generics as G
 --   'join' . 'trivial'' fl 'pure'
 --      = 'id' :: m -> m
 -- @
-type Flay (c :: * -> Constraint) m s t f g
-  = (forall a. Dict (c a) -> f a -> m (g a)) -> s -> m t
+type Flay (c :: k -> Constraint) (m :: * -> *) s t (f :: k -> *) (g :: k -> *)
+  = (forall (a :: k). Dict (c a) -> f a -> m (g a)) -> s -> m t
 
 --------------------------------------------------------------------------------
 
@@ -79,7 +79,9 @@ type Flay (c :: * -> Constraint) m s t f g
 --
 -- When defining 'Flayable' instances, you will usually leave @c@, @m@, @f@, and
 -- @g@ polymomrphic.
-class Applicative m => Flayable c m s t f g | s -> f, t -> g, s g -> t, t f -> s where
+
+-- TODO: See if `c` can be made of kind `k -> Constraint` in GHC 8.2.
+class Flayable (c :: * -> Constraint) m s t f g | s -> f, t -> g, s g -> t, t f -> s where
   flay :: Flay c m s t f g
   -- | If @s@ and @g@ are instances of 'G.Generic', then 'flay' gets a default
   -- implementation.
@@ -94,12 +96,12 @@ class Applicative m => Flayable c m s t f g | s -> f, t -> g, s g -> t, t f -> s
   -- Notice that while this default definition work for an @s@ having "nested
   -- 'Flayables'", GHC will prompt you for some additional constraints related
   -- to 'GFlay'' in that case.
-  default flay :: GFlay c m s t f g => Flay c m s t f g
+  default flay :: (Functor m, GFlay c m s t f g) => Flay c m s t f g
   flay = gflay
   {-# INLINE flay #-}
 
 -- | Isomorphic to @c a => f a -> m (g a)@.
-instance (Applicative m, c a) => Flayable c m (f a) (g a) f g where
+instance {-# OVERLAPPABLE #-} c a => Flayable c m (f a) (g a) f g where
   flay = \h fa -> h Dict fa
   {-# INLINE flay #-}
 
@@ -145,27 +147,30 @@ trivial = trivial' flay
 --------------------------------------------------------------------------------
 
 -- | Convenience 'Constraint' for satisfying basic 'GFlay'' needs for @s@ and @t@.
-class (G.Generic s, G.Generic t, GFlay' c m (G.Rep s) (G.Rep t) f g) => GFlay c m s t f g
-instance (G.Generic s, G.Generic t, GFlay' c m (G.Rep s) (G.Rep t) f g) => GFlay c m s t f g
+class (G.Generic s, G.Generic t, GFlay' c m (G.Rep s) (G.Rep t) f g)
+  => GFlay (c :: k -> Constraint) m s t f g
+instance (G.Generic s, G.Generic t, GFlay' c m (G.Rep s) (G.Rep t) f g)
+  => GFlay (c :: k -> Constraint) m s t f g
 
-gflay :: GFlay c m s t f g => Flay c m s t f g
+gflay :: (Functor m, GFlay c m s t f g) => Flay c m s t f g
 gflay = \h s -> G.to <$> gflay' h (G.from s)
 {-# INLINE gflay #-}
 
-class Applicative m => GFlay' c m s t f g where
+class GFlay' (c :: k -> Constraint) m s t f g where
   gflay' :: Flay c m (s p) (t p) f g
 
-instance Applicative m => GFlay' c m G.V1 G.V1 f g where
+instance GFlay' c m G.V1 G.V1 f g where
   gflay' _ _ = undefined -- unreachable
   {-# INLINE gflay' #-}
 
--- Is this OK? Necessary?
-instance GFlay' c m s t f g
+-- Is this necessary?
+instance (Functor m, GFlay' c m s t f g)
   => GFlay' c m (G.Rec1 s) (G.Rec1 t) f g where
   gflay' h (G.Rec1 sp) = G.Rec1 <$> gflay' h sp
   {-# INLINE gflay' #-}
 
-instance (Flayable c m (f a) (g a) f g, c a) => GFlay' c m (G.K1 r (f a)) (G.K1 r (g a)) f g where
+instance (Functor m, Flayable c m (f a) (g a) f g, c a)
+  => GFlay' c m (G.K1 r (f a)) (G.K1 r (g a)) f g where
   gflay' h (G.K1 fa) = G.K1 <$> flay h fa
   {-# INLINE gflay' #-}
 
@@ -173,16 +178,17 @@ instance Applicative m => GFlay' c m (G.K1 r x) (G.K1 r x) f g where
   gflay' _ x = pure x
   {-# INLINE gflay' #-}
 
-instance GFlay' c m s t f g => GFlay' c m (G.M1 i j s) (G.M1 i j t) f g where
+instance (Functor m, GFlay' c m s t f g)
+  => GFlay' c m (G.M1 i j s) (G.M1 i j t) f g where
   gflay' h (G.M1 sp) = G.M1 <$> gflay' h sp
   {-# INLINE gflay' #-}
 
-instance (GFlay' c m sl tl f g, GFlay' c m sr tr f g)
+instance (Applicative m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
   => GFlay' c m (sl G.:*: sr) (tl G.:*: tr) f g where
   gflay' h (slp G.:*: srp) = (G.:*:) <$> gflay' h slp <*> gflay' h srp
   {-# INLINE gflay' #-}
 
-instance (GFlay' c m sl tl f g, GFlay' c m sr tr f g)
+instance (Functor m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
   => GFlay' c m (sl G.:+: sr) (tl G.:+: tr) f g where
   gflay' h x = case x of
     G.L1 slp -> G.L1 <$> gflay' h slp
