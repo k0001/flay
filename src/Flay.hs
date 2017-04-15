@@ -80,7 +80,7 @@ type Flay (c :: k -> Constraint) (m :: * -> *) s t (f :: k -> *) (g :: k -> *)
 -- When defining 'Flayable' instances, you will usually leave @c@, @m@, @f@, and
 -- @g@ polymomrphic.
 
--- TODO: See if `c` can be made of kind `k -> Constraint` in GHC 8.2.
+-- TODO: See if `c` can be made of kind `k -> Constraint`.
 class Flayable (c :: * -> Constraint) m s t f g | s -> f, t -> g, s g -> t, t f -> s where
   flay :: Flay c m s t f g
   -- | If @s@ and @g@ are instances of 'G.Generic', then 'flay' gets a default
