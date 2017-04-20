@@ -9,10 +9,10 @@ extra-source-files: README.md CHANGELOG.md
 category: Data
 build-type: Simple
 cabal-version: >=1.18
-synopsis: Work on your datatype without knowing much about it.
+synopsis: Work on your datatype without knowing its shape nor its contents.
 description:
-  Work on your datatype without knowing much about it.
-  A mixture of traversals and natural transformations.
+  Work on your datatype without knowing its shape nor its contents using
+  a principlied approach.
 homepage: https://github.com/k0001/flay
 bug-reports: https://github.com/k0001/flay/issues
 

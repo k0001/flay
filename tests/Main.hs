@@ -92,18 +92,18 @@ main = Tasty.defaultMainWithIngredients
 
 tt :: Tasty.TestTree
 tt = Tasty.testGroup "main"
-  [ QC.testProperty "Flayable: Foo: identity law 1" $
+  [ QC.testProperty "Flayable: Foo: inner identity law" $
       QC.forAll QC.arbitrary $ \(foo :: Foo Maybe) ->
-         foo === runIdentity (trivial pure foo)
-  , QC.testProperty "Flayable: Bar: identity law 1" $
+         foo === inner flay foo
+  , QC.testProperty "Flayable: Bar: inner identity law" $
       QC.forAll QC.arbitrary $ \(bar :: Bar Maybe) ->
-         bar === runIdentity (trivial pure bar)
-  , QC.testProperty "Flayable: Qux: identity law 1" $
+         bar === inner flay bar
+  , QC.testProperty "Flayable: Qux: inner identity law" $
       QC.forAll QC.arbitrary $ \(qux :: Qux Maybe) ->
-         qux === runIdentity (trivial pure qux)
-  , QC.testProperty "Flayable: identity law 2" $
+         qux === inner flay qux
+  , QC.testProperty "Flayable: outer identity law" $
       QC.forAll QC.arbitrary $ \(ia :: Identity Int) ->
-         ia === join (trivial pure ia)
+         ia === outer flay ia
   , QC.testProperty "collectShow: Foo: flayFoo" $
       QC.forAll QC.arbitrary $ \foo@(Foo (Identity a) (Identity b)) ->
          [show a, show b] === collectShow' flayFoo foo
