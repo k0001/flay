@@ -212,7 +212,7 @@ instance Trivial (a :: k)
 -- all you can do with such @a@ is pass it around.
 --
 -- @
--- 'trivial' fl h
+-- 'trivial'' fl h
 --    = fl (\\('Dict' :: 'Dict' ('Trivial' a)) (fa :: f a) -> h fa)
 -- @
 trivial'
