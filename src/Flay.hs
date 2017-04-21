@@ -213,7 +213,7 @@ instance Trivial (a :: k)
 --
 -- @
 -- 'trivial' fl h
---    = fl (\('Dict' :: 'Dict' ('Trivial' a)) (fa :: f a) -> h fa)
+--    = fl (\\('Dict' :: 'Dict' ('Trivial' a)) (fa :: f a) -> h fa)
 -- @
 trivial'
   :: forall m s t f g
