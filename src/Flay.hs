@@ -54,7 +54,8 @@ import qualified GHC.Generics as G
 -- @(forall a. c a => f a -> m (g a))@ to targeted occurences of @f a@ inside
 -- @s@.
 --
--- A 'Flay' must obey the 'inner' and 'outer' identity laws.
+-- A 'Flay' must obey the 'inner' identity law (and 'outer' identity law as
+-- well, if the 'Flay' fits the type expected by 'outer').
 --
 -- When using a 'Flay', @m@ will be required to be a 'Functor' in case the 'Flay'
 -- targets one element, or an 'Applicative' if it targets more than one. There
@@ -106,7 +107,7 @@ import qualified GHC.Generics as G
 -- @
 --
 -- 'Flay', among other things, is intended to generalize this pattern so that
--- what choice of 'Foo', 'Maybe' or 'Identity' you make, you can use
+-- whatever choice of 'Foo', 'Maybe' or 'Identity' you make, you can use
 -- 'Applicative' this way. The easiest way to use 'Flay' is through 'trivial'',
 -- which is sufficient unless we need to enforce some constrain in the target
 -- elements wrapped in @m@ inside foo (we don't need this now). With 'trivial'',
@@ -167,10 +168,8 @@ outer fl = join . trivial' fl pure
 --
 -- When defining 'Flayable' instances, you will usually leave @c@, @m@, @f@, and
 -- @g@ polymomrphic.
---
--- 'flay' must obey the 'inner' and 'outer' identity laws.
 
--- TODO: See if `c` can be made of kind `k -> Constraint`.
+-- TODO: See if `c` can be made of kind `k -> Constraint`, probably in GHC 8.2.
 class Flayable (c :: * -> Constraint) m s t f g | s -> f, t -> g, s g -> t, t f -> s where
   flay :: Flay c m s t f g
   -- | If @s@ and @g@ are instances of 'G.Generic', then 'flay' gets a default
