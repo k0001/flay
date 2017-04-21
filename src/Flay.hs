@@ -116,7 +116,7 @@ import qualified GHC.Generics as G
 -- 'Applicative' this way. The easiest way to use 'Flay' is through 'trivial'',
 -- which is sufficient unless we need to enforce some constrain in the target
 -- elements wrapped in @m@ inside foo (we don't need this now). With 'trivial'',
--- we could have defined @fooFToIdentity@ this way:
+-- we could have defined @fooMToIdentity@ this way:
 --
 -- @
 -- fooMToIdentity :: 'Applicative' m => Foo m -> m (Foo 'Identity')
