@@ -2,8 +2,8 @@
 , nixpkgs ? (import nixpkgsBootstrap {}).fetchFromGitHub {
     owner = "NixOS";
     repo = "nixpkgs";
-    rev = "b12aacc7c18fb3f29febc842aaa3d0c0e5622546"; # release-17.03
-    sha256 = "1qklmrvfnlk1r6rqxpddllfkv3pihfms370qfsznm959i7hxcv2v"; }
+    rev = "100919ab5b69cbbb26886421aacc692467c7fec4"; # release-17.03
+    sha256 = "1nqiphqvxzszi0r4qq8w39x0g08wc7vaa9mfl7gi4a28bkv99781"; }
 }:
 
 let
