@@ -57,6 +57,9 @@ import qualified GHC.Generics as G
 -- A 'Flay' must obey the 'inner' identity law (and 'outer' identity law as
 -- well, if the 'Flay' fits the type expected by 'outer').
 --
+-- When defining 'Flay' values, you should leave @c@, @m@, @f@, and @g@ fully
+-- polymomrphic, as these are the most useful types of 'Flay's.
+--
 -- When using a 'Flay', @m@ will be required to be a 'Functor' in case the 'Flay'
 -- targets one element, or an 'Applicative' if it targets more than one. There
 -- will be no constraints on the rest of the arguments to 'Flay'.
@@ -168,8 +171,8 @@ outer fl = join . trivial' fl pure
 
 -- | Default 'Flay' implementation for @s@ and @t@.
 --
--- When defining 'Flayable' instances, you will usually leave @c@, @m@, @f@, and
--- @g@ polymomrphic.
+-- When defining 'Flayable' instances, you should leave @c@, @m@, @f@, and @g@
+-- fully polymomrphic, as these are the most useful types of 'Flayables's.
 
 -- TODO: See if `c` can be made of kind `k -> Constraint`, probably in GHC 8.2.
 class Flayable (c :: * -> Constraint) m s t f g | s -> f, t -> g, s g -> t, t f -> s where
