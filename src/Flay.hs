@@ -63,6 +63,8 @@ import qualified GHC.Generics as G
 --
 -- /to flay: tr. v., to strip off the skin or surface of./
 --
+-- Mnemonic for @c m s t f g@: CoMmon STandard FoG.
+--
 -- Example 'Flay':
 --
 -- @
