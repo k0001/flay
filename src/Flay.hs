@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
@@ -46,8 +47,9 @@ module Flay
  , collect'
  -- ** Re-exports
  , Dict(Dict)
+ , Product(Pair)
  -- ** Experimental
- , zip'
+ , unsafeZip'
  ) where
 
 import Control.Monad (join)
@@ -537,24 +539,26 @@ collect1 = collect' flay1
 -- | TODO Make sure the two @s@ have only one constructor.
 --
 -- TODO Make sure the two flays target the same things.
-zip'
-  :: forall s t0 t1 f
-  .  (Flay Trivial s t0 f (Const ()))
-  -> (Flay Trivial s t1 f (Product f f))
+unsafeZip'
+  :: forall s t0 t1 f g h
+  .  (forall x. f x -> g x -> h x)
+  -> (Flay Trivial s t0 f (Const ()))
+  -> (Flay Trivial s t1 g h)
   -> s
   -> s
   -> t1
-zip' fl0 fl1 = \s0 s1 -> runST $ do
+unsafeZip' pair fl0 fl1 = \s0 s1 -> runST $ do
     r <- newSTRef (collect' fl0 f1 s0)
     fl1 (f2 r) s1
   where
     f1 :: Dict (Trivial a) -> f a -> [Any]
     f1 = \Dict fa -> [unsafeCoerce fa :: Any]
-    f2 :: STRef z [Any] -> Dict (Trivial a) -> f a -> ST z (Product f f a)
-    f2 r = \Dict fa -> do
+    f2 :: STRef z [Any] -> Dict (Trivial a) -> g a -> ST z (h a)
+    f2 r = \Dict !ga -> do
        (x:xs) <- readSTRef r
        writeSTRef r xs
-       pure (Pair (unsafeCoerce (x :: Any)) fa)
+       let !fa = unsafeCoerce (x :: Any) :: f a
+       pure $! pair fa ga
 
 --------------------------------------------------------------------------------
 
