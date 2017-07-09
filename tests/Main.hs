@@ -31,6 +31,7 @@ flayFoo :: (c Int, c Bool) => Flay c (Foo f) (Foo g) f g
 flayFoo h (Foo a b) = Foo <$> h Dict a <*> h Dict b
 
 instance (c Int, c Bool) => Flayable c (Foo f) (Foo g) f g
+instance (c Int, c Bool) => Flayable1 c Foo
 
 deriving instance (Eq (f Int), Eq (f Bool)) => Eq (Foo f)
 deriving instance (Show (f Int), Show (f Bool)) => Show (Foo f)
@@ -46,7 +47,8 @@ data Bar f = Bar (f Int) Int
 flayBar :: c Int => Flay c (Bar f) (Bar g) f g
 flayBar h (Bar a b) = Bar <$> h Dict a <*> pure b
 
-instance (c Int, c Bool) => Flayable c (Bar f) (Bar g) f g
+instance (c Int) => Flayable c (Bar f) (Bar g) f g where flay = flay1
+instance (c Int) => Flayable1 c Bar where flay1 = flayBar
 
 deriving instance Eq (f Int) => Eq (Bar f)
 deriving instance Show (f Int) => Show (Bar f)
@@ -110,10 +112,16 @@ tt = Tasty.testGroup "main"
   , QC.testProperty "collectShow: Foo: flay" $
       QC.forAll QC.arbitrary $ \foo@(Foo (Identity a) (Identity b)) ->
          [show a, show b] === collectShow' flay foo
+  , QC.testProperty "collectShow: Foo: flay1" $
+      QC.forAll QC.arbitrary $ \foo@(Foo (Identity a) (Identity b)) ->
+         [show a, show b] === collectShow' flay1 foo
   , QC.testProperty "collectShow: Bar: flayBar" $
       QC.forAll QC.arbitrary $ \bar@(Bar (Identity a) _) ->
          [show a] === collectShow' flayBar bar
   , QC.testProperty "collectShow: Bar: flay" $
+      QC.forAll QC.arbitrary $ \bar@(Bar (Identity a) _) ->
+         [show a] === collectShow' flay bar
+  , QC.testProperty "collectShow: Bar: flay1" $
       QC.forAll QC.arbitrary $ \bar@(Bar (Identity a) _) ->
          [show a] === collectShow' flay bar
   ]

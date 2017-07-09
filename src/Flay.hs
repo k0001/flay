@@ -12,9 +12,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 
--- {-# LANGUAGE LambdaCase #-}
--- {-# LANGUAGE StandaloneDeriving #-}
-
 -- | The most commonly used names in this module are intended to be imported
 -- unqualified:
 --
@@ -33,6 +30,7 @@ module Flay
  , outer
  -- * Flayable
  , Flayable(flay)
+ , Flayable1(flay1)
  -- ** Generics
  , gflay
  , GFlay
@@ -340,20 +338,22 @@ outer fl = join . trivial' fl pure
 
 -- TODO: See if `c` can be made of kind `k -> Constraint`, probably in GHC 8.2.
 class Flayable (c :: * -> Constraint) s t f g | s -> f, t -> g, s g -> t, t f -> s where
-  flay ::  Flay c s t f g
-  -- | If @s@ and @g@ are instances of 'G.Generic', then 'flay' gets a default
+  -- | If @s@ and @t@ are instances of 'G.Generic', then 'flay' gets a default
   -- implementation. For example, provided the @Foo@ datatype shown in the
   -- documentation for 'Flay' had a 'G.Generic' instance, then the following
   -- 'Flayable' instance would get a default implementation for 'flay':
   --
   -- @
-  -- instance ('Applicative' m, c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g
+  -- instance (c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g
   -- @
   --
   -- Notice that while this default definition works for an @s@ having "nested
   -- 'Flayables'", GHC will prompt you for some additional constraints related
   -- to 'GFlay'' in order for it to compile. Just follow the compiler
   -- instructions regarding this, and everything will work fine.
+  --
+  -- Notice that 'flay' can be defined in terms of 'flay1' as well.
+  flay ::  Flay c s t f g
   default flay :: GFlay c s t f g => Flay c s t f g
   flay = gflay
   {-# INLINE flay #-}
@@ -362,6 +362,23 @@ class Flayable (c :: * -> Constraint) s t f g | s -> f, t -> g, s g -> t, t f ->
 instance {-# OVERLAPPABLE #-} c a => Flayable c (f a) (g a) f g where
   flay = \h fa -> h Dict fa
   {-# INLINE flay #-}
+
+--------------------------------------------------------------------------------
+
+-- | 'Flayable1' is 'Flayable' specialized for the common case of @s ~ r f@ and
+-- @t ~ r g@. The rationale for introducing this seemingly redundant class is
+-- that the 'Flayable1' constraint is less verbose than 'Flayable'.
+--
+-- Unfortunately, we can't readily existentialize the arguments to 'Flayable',
+-- which is why you'll need to specify both 'Flayable1' and 'Flayable'
+-- instances. Notice, however, that 'flay1' can be defined in terms of
+-- 'flay' and vice-versa, so this should be very mechanical.
+class Flayable1 (c :: * -> Constraint) (r :: (* -> *) -> *) where
+  -- | By default, 'flay1' is defined in terms of 'flay'
+  flay1 :: Flay c (r f) (r g) f g
+  default flay1 :: Flayable c (r f) (r g) f g => Flay c (r f) (r g) f g
+  flay1 = flay
+  {-# INLINE flay1 #-}
 
 --------------------------------------------------------------------------------
 
