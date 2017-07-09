@@ -49,14 +49,14 @@ module Flay
  ) where
 
 import Control.Monad (join)
-import Data.Functor.Identity (Identity, runIdentity)
+import Data.Functor.Identity (runIdentity)
 import Data.Functor.Const (Const(Const, getConst))
 import Data.Constraint (Constraint, Dict(Dict))
 import qualified GHC.Generics as G
 
 --------------------------------------------------------------------------------
 
--- | @'Flay' c m s t f g@ allows converting @s@ to @t@ by replacing
+-- | @'Flay' c s t f g@ allows converting @s@ to @t@ by replacing
 -- ocurrences of @f@ with @g@ by applicatively applying a function
 -- @(forall a. c a => f a -> m (g a))@ to targeted occurences of @f a@ inside
 -- @s@.
@@ -64,12 +64,8 @@ import qualified GHC.Generics as G
 -- A 'Flay' must obey the 'inner' identity law (and 'outer' identity law as
 -- well, if the 'Flay' fits the type expected by 'outer').
 --
--- When defining 'Flay' values, you should leave @c@, @m@, @f@, and @g@ fully
+-- When defining 'Flay' values, you should leave @c@, @f@, and @g@ fully
 -- polymomrphic, as these are the most useful types of 'Flay's.
---
--- When using a 'Flay', @m@ will be required to be a 'Functor' in case the 'Flay'
--- targets one element, or an 'Applicative' if it targets more than one. There
--- will be no constraints on the rest of the arguments to 'Flay'.
 --
 -- We use @'Dict' (c a) ->@ instead of @c a =>@ because the latter is often not
 -- enough to satisfy the type checker. With this approach, one must explicitely
@@ -80,7 +76,7 @@ import qualified GHC.Generics as G
 --
 -- /to flay: tr. v., to strip off the skin or surface of./
 --
--- /Mnemonic for @c m s t f g@: CoMmon STandard FoG./
+-- /Mnemonic for @c s t f g@: Common STandard FoG./
 --
 -- ==== Example 1: Removing uncertaininy
 --
@@ -93,7 +89,7 @@ import qualified GHC.Generics as G
 -- @
 --
 -- @
--- flayFoo :: ('Applicative' m, c 'Int', c 'Bool') => 'Flay' c m (Foo f) (Foo g) f g
+-- flayFoo :: ('Applicative' m, c 'Int', c 'Bool') => 'Flay' c (Foo f) (Foo g) f g
 -- flayFoo h (Foo a b) = Foo \<$> h 'Dict' a \<*> h 'Dict' b
 -- @
 --
@@ -201,7 +197,7 @@ import qualified GHC.Generics as G
 --
 -- ==== Example 2: Standalone @m@
 --
--- In the previous example, @flayFoo@ took the type @Flay 'Trivial' m (Foo m) (Foo
+-- In the previous example, @flayFoo@ took the type @Flay 'Trivial' (Foo m) (Foo
 -- g) m g@ when it was used in @flayMToG@. That is, @m@ and @f@ were unified by
 -- our use of 'fmap'. However, keeping these different opens interesting
 -- possibilities. For example, let's try and convert a @Foo 'Maybe'@ to a @Foo
@@ -314,15 +310,16 @@ import qualified GHC.Generics as G
 -- about the targets themselves beyond the fact that they satisfy a particular
 -- constraint.
 --
-type Flay (c :: k -> Constraint) (m :: * -> *) s t (f :: k -> *) (g :: k -> *)
-  = (forall (a :: k). Dict (c a) -> f a -> m (g a)) -> s -> m t
+type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+  = forall m. Applicative m
+       => (forall (a :: k). Dict (c a) -> f a -> m (g a)) -> s -> m t
 
 -- | Inner identity law:
 --
 -- @
 -- (\\fl -> 'runIdentity' . 'trivial'' fl 'pure') = 'id'
 -- @
-inner :: Flay Trivial Identity s s f f -> s -> s
+inner :: Flay Trivial s s f f -> s -> s
 inner fl = runIdentity . trivial' fl pure
 
 -- | Outer identity law:
@@ -330,7 +327,7 @@ inner fl = runIdentity . trivial' fl pure
 -- @
 -- (\\fl -> 'join' . 'trivial'' fl 'pure') = 'id'
 -- @
-outer :: Monad m => Flay Trivial m (m x) (m x) m m -> m x -> m x
+outer :: Monad m => Flay Trivial (m x) (m x) m m -> m x -> m x
 outer fl = join . trivial' fl pure
 
 
@@ -338,30 +335,31 @@ outer fl = join . trivial' fl pure
 
 -- | Default 'Flay' implementation for @s@ and @t@.
 --
--- When defining 'Flayable' instances, you should leave @c@, @m@, @f@, and @g@
+-- When defining 'Flayable' instances, you should leave @c@, @f@, and @g@
 -- fully polymomrphic, as these are the most useful types of 'Flayables's.
 
 -- TODO: See if `c` can be made of kind `k -> Constraint`, probably in GHC 8.2.
-class Flayable (c :: * -> Constraint) m s t f g | s -> f, t -> g, s g -> t, t f -> s where
-  flay :: Flay c m s t f g
+class Flayable (c :: * -> Constraint) s t f g | s -> f, t -> g, s g -> t, t f -> s where
+  flay ::  Flay c s t f g
   -- | If @s@ and @g@ are instances of 'G.Generic', then 'flay' gets a default
   -- implementation. For example, provided the @Foo@ datatype shown in the
   -- documentation for 'Flay' had a 'G.Generic' instance, then the following
   -- 'Flayable' instance would get a default implementation for 'flay':
   --
   -- @
-  -- instance ('Applicative' m, c 'Int', c 'Bool') => 'Flayable' c m (Foo f) (Foo g) f g
+  -- instance ('Applicative' m, c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g
   -- @
   --
   -- Notice that while this default definition works for an @s@ having "nested
   -- 'Flayables'", GHC will prompt you for some additional constraints related
-  -- to 'GFlay'' in order for it to compile.
-  default flay :: (Functor m, GFlay c m s t f g) => Flay c m s t f g
+  -- to 'GFlay'' in order for it to compile. Just follow the compiler
+  -- instructions regarding this, and everything will work fine.
+  default flay :: GFlay c s t f g => Flay c s t f g
   flay = gflay
   {-# INLINE flay #-}
 
 -- | Isomorphic to @c a => f a -> m (g a)@.
-instance {-# OVERLAPPABLE #-} c a => Flayable c m (f a) (g a) f g where
+instance {-# OVERLAPPABLE #-} c a => Flayable c (f a) (g a) f g where
   flay = \h fa -> h Dict fa
   {-# INLINE flay #-}
 
@@ -384,7 +382,8 @@ instance Trivial (a :: k)
 -- @
 trivial'
   :: forall m s t f g
-  .  Flay Trivial m s t f g
+  .  Applicative m
+  => Flay Trivial s t f g
   -> (forall a. Trivial a => f a -> m (g a))
   -> s
   -> m t  -- ^
@@ -398,7 +397,7 @@ trivial' fl = \h s -> fl (\Dict fa -> h fa) s
 -- 'trivial' = 'trivial'' 'flay'
 -- @
 trivial
-  :: Flayable Trivial m s t f g
+  :: (Applicative m, Flayable Trivial s t f g)
   => (forall a. Trivial a => f a -> m (g a))
   -> s
   -> m t  -- ^
@@ -408,55 +407,53 @@ trivial = trivial' flay
 --------------------------------------------------------------------------------
 
 -- | Convenience 'Constraint' for satisfying basic 'GFlay'' needs for @s@ and @t@.
-class (G.Generic s, G.Generic t, GFlay' c m (G.Rep s) (G.Rep t) f g)
-  => GFlay (c :: k -> Constraint) m s t f g
-instance (G.Generic s, G.Generic t, GFlay' c m (G.Rep s) (G.Rep t) f g)
-  => GFlay (c :: k -> Constraint) m s t f g
+class (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
+  => GFlay (c :: k -> Constraint) s t f g
+instance (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
+  => GFlay (c :: k -> Constraint) s t f g
 
-gflay :: (Functor m, GFlay c m s t f g) => Flay c m s t f g
+gflay :: GFlay c s t f g => Flay c s t f g
 gflay = \h s -> G.to <$> gflay' h (G.from s)
 {-# INLINE gflay #-}
 
-class GFlay' (c :: k -> Constraint) m s t f g where
-  gflay' :: Flay c m (s p) (t p) f g
+class GFlay' (c :: k -> Constraint) s t f g where
+  gflay' :: Flay c (s p) (t p) f g
 
-instance GFlay' c m G.V1 G.V1 f g where
+instance GFlay' c G.V1 G.V1 f g where
   gflay' _ _ = undefined -- unreachable
   {-# INLINE gflay' #-}
 
 -- Is this necessary?
-instance (Functor m, GFlay' c m s t f g)
-  => GFlay' c m (G.Rec1 s) (G.Rec1 t) f g where
+instance (GFlay' c s t f g) => GFlay' c (G.Rec1 s) (G.Rec1 t) f g where
   gflay' h (G.Rec1 sp) = G.Rec1 <$> gflay' h sp
   {-# INLINE gflay' #-}
 
-instance (Functor m, Flayable c m (f a) (g a) f g) => GFlay' c m (G.K1 r (f a)) (G.K1 r (g a)) f g where
+instance (Flayable c (f a) (g a) f g) => GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
   gflay' h (G.K1 fa) = G.K1 <$> flay h fa
   {-# INLINE gflay' #-}
 
-instance Applicative m => GFlay' c m (G.K1 r x) (G.K1 r x) f g where
+instance GFlay' c (G.K1 r x) (G.K1 r x) f g where
   gflay' _ x = pure x
   {-# INLINE gflay' #-}
 
-instance (Functor m, GFlay' c m s t f g)
-  => GFlay' c m (G.M1 i j s) (G.M1 i j t) f g where
+instance (GFlay' c s t f g)
+  => GFlay' c (G.M1 i j s) (G.M1 i j t) f g where
   gflay' h (G.M1 sp) = G.M1 <$> gflay' h sp
   {-# INLINE gflay' #-}
 
-instance (Applicative m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
-  => GFlay' c m (sl G.:*: sr) (tl G.:*: tr) f g where
+instance (GFlay' c sl tl f g, GFlay' c sr tr f g)
+  => GFlay' c (sl G.:*: sr) (tl G.:*: tr) f g where
   gflay' h (slp G.:*: srp) = (G.:*:) <$> gflay' h slp <*> gflay' h srp
   {-# INLINE gflay' #-}
 
-instance (Functor m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
-  => GFlay' c m (sl G.:+: sr) (tl G.:+: tr) f g where
+instance (GFlay' c sl tl f g, GFlay' c sr tr f g)
+  => GFlay' c (sl G.:+: sr) (tl G.:+: tr) f g where
   gflay' h x = case x of
     G.L1 slp -> G.L1 <$> gflay' h slp
     G.R1 srp -> G.R1 <$> gflay' h srp
   {-# INLINE gflay' #-}
 
 --------------------------------------------------------------------------------
-
 -- | Collect all of the @f a@ of the given 'Flay' into a 'Monoid' @b@.
 --
 -- Example usage, given 'Foo' and 'flayFoo' examples given in the documentation
@@ -470,7 +467,7 @@ instance (Functor m, GFlay' c m sl tl f g, GFlay' c m sr tr f g)
 -- @
 collect'
   :: Monoid b
-  => Flay c (Const b) s t f (Const ())
+  => Flay c s t f (Const ())
   -> (forall a. Dict (c a) -> f a -> b)
   -> s
   -> b    -- ^
@@ -479,7 +476,7 @@ collect' fl k = \s -> getConst (fl (\d fa -> Const (k d fa)) s)
 
 -- | Like 'collect'', but works on a 'Flayable' instead of an explicit 'Flay'.
 collect
-  :: (Monoid b, Flayable c (Const b) s t f (Const ()))
+  :: (Monoid b, Flayable c s t f (Const ()))
   => (forall a. Dict (c a) -> f a -> b)
   -> s
   -> b    -- ^

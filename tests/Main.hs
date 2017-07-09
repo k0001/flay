@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -26,10 +27,10 @@ import Flay
 data Foo f = Foo (f Int) (f Bool)
   deriving (Generic)
 
-flayFoo :: (Applicative m, c Int, c Bool) => Flay c m (Foo f) (Foo g) f g
+flayFoo :: (c Int, c Bool) => Flay c (Foo f) (Foo g) f g
 flayFoo h (Foo a b) = Foo <$> h Dict a <*> h Dict b
 
-instance (Applicative m, c Int, c Bool) => Flayable c m (Foo f) (Foo g) f g
+instance (c Int, c Bool) => Flayable c (Foo f) (Foo g) f g
 
 deriving instance (Eq (f Int), Eq (f Bool)) => Eq (Foo f)
 deriving instance (Show (f Int), Show (f Bool)) => Show (Foo f)
@@ -42,10 +43,10 @@ instance (QC.Arbitrary (f Int), QC.Arbitrary (f Bool)) => QC.Arbitrary (Foo f) w
 data Bar f = Bar (f Int) Int
   deriving (Generic)
 
-flayBar :: (Applicative m, c Int) => Flay c m (Bar f) (Bar g) f g
+flayBar :: c Int => Flay c (Bar f) (Bar g) f g
 flayBar h (Bar a b) = Bar <$> h Dict a <*> pure b
 
-instance (Applicative m, c Int, c Bool) => Flayable c m (Bar f) (Bar g) f g
+instance (c Int, c Bool) => Flayable c (Bar f) (Bar g) f g
 
 deriving instance Eq (f Int) => Eq (Bar f)
 deriving instance Show (f Int) => Show (Bar f)
@@ -61,18 +62,17 @@ data Qux f
   | Qux3 (Foo f)
   deriving (Generic)
 
-flayQux :: (Applicative m, c Int, c Bool) => Flay c m (Qux f) (Qux g) f g
+flayQux :: (c Int, c Bool) => Flay c (Qux f) (Qux g) f g
 flayQux h (Qux1 a b) = Qux1 <$> h Dict a <*> pure b
 flayQux h (Qux2 a b) = Qux2 <$> h Dict a <*> h Dict b
 flayQux h (Qux3 a) = Qux3 <$> flayFoo h a
 
 -- TODO: See if there is a way of removing all these constraints.
 instance
-  ( GFlay' c m (G.K1 G.R (Foo f)) (G.K1 G.R (Foo g)) f g
-  , Applicative m
+  ( GFlay' c (G.K1 G.R (Foo f)) (G.K1 G.R (Foo g)) f g
   , c Int
   , c Bool
-  ) => Flayable c m (Qux f) (Qux g) f g
+  ) => Flayable c (Qux f) (Qux g) f g
 
 deriving instance (Eq (f Int), Eq (Foo f)) => Eq (Qux f)
 deriving instance (Show (f Int), Show (Foo f)) => Show (Qux f)
@@ -120,5 +120,5 @@ tt = Tasty.testGroup "main"
 
 
 collectShow'
-  :: Flay Show (Const [String]) s t Identity (Const ()) -> s -> [String]
+  :: Flay Show s t Identity (Const ()) -> s -> [String]
 collectShow' fl = collect' fl (\Dict (Identity a) -> [show a])
