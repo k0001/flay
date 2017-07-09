@@ -39,8 +39,10 @@ module Flay
  , All
  , Trivial
  , trivial
+ , trivial1
  , trivial'
  , collect
+ , collect1
  , collect'
  -- ** Re-exports
  , Dict(Dict)
@@ -404,7 +406,7 @@ trivial'
   -> (forall a. Trivial a => f a -> m (g a))
   -> s
   -> m t  -- ^
-trivial' fl = \h s -> fl (\Dict fa -> h fa) s
+trivial' fl = \h -> \s -> fl (\Dict fa -> h fa) s
 {-# INLINE trivial' #-}
 
 -- | Like 'trivial'', but works on a 'Flayable' instead of taking an explicit
@@ -420,6 +422,20 @@ trivial
   -> m t  -- ^
 trivial = trivial' flay
 {-# INLINE trivial #-}
+
+-- | Like 'trivial'', but works on a 'Flayable1' instead of taking an explicit
+-- 'Flay'.
+--
+-- @
+-- 'trivial' = 'trivial'' 'flay1'
+-- @
+trivial1
+  :: (Applicative m, Flayable1 Trivial r)
+  => (forall a. Trivial a => f a -> m (g a))
+  -> (r f)
+  -> m (r g)  -- ^
+trivial1 = trivial' flay1
+{-# INLINE trivial1 #-}
 
 --------------------------------------------------------------------------------
 
@@ -488,7 +504,7 @@ collect'
   -> (forall a. Dict (c a) -> f a -> b)
   -> s
   -> b    -- ^
-collect' fl k = \s -> getConst (fl (\d fa -> Const (k d fa)) s)
+collect' fl = \k -> \s -> getConst (fl (\d fa -> Const (k d fa)) s)
 {-# INLINE collect' #-}
 
 -- | Like 'collect'', but works on a 'Flayable' instead of an explicit 'Flay'.
@@ -497,9 +513,17 @@ collect
   => (forall a. Dict (c a) -> f a -> b)
   -> s
   -> b    -- ^
-collect k = collect' flay k
+collect = collect' flay
 {-# INLINE collect #-}
 
+-- | Like 'collect'', but works on a 'Flayable1' instead of an explicit 'Flay'.
+collect1
+  :: (Monoid b, Flayable1 c r)
+  => (forall a. Dict (c a) -> f a -> b)
+  -> r f
+  -> b    -- ^
+collect1 = collect' flay1
+{-# INLINE collect1 #-}
 --------------------------------------------------------------------------------
 
 -- | Ensure that @x@ satisfies all of the constraints listed in @cs@.
