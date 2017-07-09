@@ -46,13 +46,21 @@ module Flay
  , collect'
  -- ** Re-exports
  , Dict(Dict)
+ -- ** Experimental
+ , zip'
  ) where
 
 import Control.Monad (join)
-import Data.Functor.Identity (runIdentity)
+import Control.Monad.ST (ST, runST)
 import Data.Functor.Const (Const(Const, getConst))
+import Data.Functor.Identity (runIdentity)
+import Data.Functor.Product (Product(Pair))
 import Data.Constraint (Constraint, Dict(Dict))
+import Data.STRef (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified GHC.Generics as G
+import GHC.Prim (Any)
+import Unsafe.Coerce (unsafeCoerce)
+
 
 --------------------------------------------------------------------------------
 
@@ -524,6 +532,28 @@ collect1
   -> b    -- ^
 collect1 = collect' flay1
 {-# INLINE collect1 #-}
+--------------------------------------------------------------------------------
+
+-- ^ TODO Make sure the two @s@ have only one constructor.
+zip'
+  :: forall s t0 t1 f
+  .  (Flay Trivial s t0 f (Const ()))
+  -> (Flay Trivial s t1 f (Product f f))
+  -> s
+  -> s
+  -> t1
+zip' fl0 fl1 = \s0 s1 -> runST $ do
+    r <- newSTRef (collect' fl0 f1 s0)
+    fl1 (f2 r) s1
+  where
+    f1 :: Dict (Trivial a) -> f a -> [Any]
+    f1 = \Dict fa -> [unsafeCoerce fa :: Any]
+    f2 :: STRef z [Any] -> Dict (Trivial a) -> f a -> ST z (Product f f a)
+    f2 r = \Dict fa -> do
+       (x:xs) <- readSTRef r
+       writeSTRef r xs
+       pure (Pair (unsafeCoerce (x :: Any)) fa)
+
 --------------------------------------------------------------------------------
 
 -- | Ensure that @x@ satisfies all of the constraints listed in @cs@.

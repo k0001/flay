@@ -27,7 +27,8 @@ library
   exposed-modules: Flay
   build-depends:
     base >=4.9 && <5.0,
-    constraints
+    constraints,
+    ghc-prim
 
 test-suite tests
   default-language: Haskell2010
