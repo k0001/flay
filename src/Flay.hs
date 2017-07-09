@@ -534,7 +534,9 @@ collect1 = collect' flay1
 {-# INLINE collect1 #-}
 --------------------------------------------------------------------------------
 
--- ^ TODO Make sure the two @s@ have only one constructor.
+-- | TODO Make sure the two @s@ have only one constructor.
+--
+-- TODO Make sure the two flays target the same things.
 zip'
   :: forall s t0 t1 f
   .  (Flay Trivial s t0 f (Const ()))
