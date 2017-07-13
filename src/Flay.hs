@@ -632,8 +632,8 @@ instance (GUnit f, GUnit g) => GUnit (f G.:*: g) where
 --
 -- TODO: Can't we have @f x -> g x -> h x@?
 zip1
-  :: (Record (s f), Flayable1 Trivial s)
-  => (forall x. f x -> f x -> g x)
+  :: (Record (s f), Flayable1 c s)
+  => (forall x. Dict (c x) -> f x -> f x -> g x)
   -> s f
   -> s f
   -> s g  -- ^
@@ -647,9 +647,9 @@ zip1 h = unsafeZip' h flay1 flay1
 -- TODO: Can't we have @f x -> g x -> h x@?
 zip
   :: ( Record s
-     , Flayable Trivial s t0 f (Const ())
-     , Flayable Trivial s t1 f g )
-  => (forall x. f x -> f x -> g x)
+     , Flayable c s t0 f (Const ())
+     , Flayable c s t1 f g )
+  => (forall x. Dict (c x) -> f x -> f x -> g x)
   -> s
   -> s
   -> t1   -- ^
@@ -658,11 +658,11 @@ zip h = unsafeZip' h flay flay
 
 -- | TODO Make sure the two flays target the same things.
 unsafeZip'
-  :: forall s t0 t1 f g h
+  :: forall c s t0 t1 f g h
   .  Record s
-  => (forall x. f x -> g x -> h x)
-  -> (Flay Trivial s t0 f (Const ()))
-  -> (Flay Trivial s t1 g h)
+  => (forall x. Dict (c x) -> f x -> g x -> h x)
+  -> (Flay c s t0 f (Const ()))
+  -> (Flay c s t1 g h)
   -> s
   -> s
   -> t1
@@ -670,14 +670,14 @@ unsafeZip' pair fl0 fl1 = \s0 s1 -> runST $ do
     r <- newSTRef (collect' fl0 f1 s0)
     fl1 (f2 r) s1
   where
-    f1 :: Dict (Trivial a) -> f a -> [Any]
+    f1 :: Dict (c a) -> f a -> [Any]
     f1 = \Dict fa -> [unsafeCoerce fa :: Any]
-    f2 :: STRef z [Any] -> Dict (Trivial a) -> g a -> ST z (h a)
+    f2 :: STRef z [Any] -> Dict (c a) -> g a -> ST z (h a)
     f2 r = \Dict !ga -> do
        (x:xs) <- readSTRef r
        writeSTRef r xs
        let !fa = unsafeCoerce (x :: Any) :: f a
-       pure $! pair fa ga
+       pure $! pair Dict fa ga
 
 --------------------------------------------------------------------------------
 
