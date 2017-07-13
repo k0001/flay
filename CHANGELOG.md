@@ -4,7 +4,7 @@
   existentialized, to be chosen by the caller.
 
 * Added `Flayable1`, `flay1`, `trivial`, `collect1`, `Record`, `Unit`, `unit`,
- `zip1`, `zip`.
+ `zip1`, `zip`, `GFlay1`.
 
 
 # Version 0.1
