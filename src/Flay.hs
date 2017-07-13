@@ -49,7 +49,7 @@ module Flay
  , zip1
  , unit
  , Unit
- , GUnit
+ , GUnit(gunit)
  , Record
  , GRecord
  -- ** Re-exports
