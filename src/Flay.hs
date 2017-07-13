@@ -44,6 +44,11 @@ module Flay
  , collect
  , collect1
  , collect'
+ , unit
+ , Unit
+ , GUnit
+ , Record
+ , GRecord
  -- ** Re-exports
  , Dict(Dict)
  ) where
@@ -524,6 +529,50 @@ collect1
   -> b    -- ^
 collect1 = collect' flay1
 {-# INLINE collect1 #-}
+--------------------------------------------------------------------------------
+
+-- | Witness that @a@ is a record type (i.e., it has only one constructor and
+-- some at least one field containing another value.
+--
+-- Note: This is intended to work well with for @a@s that could fit the @s@
+-- parameter to a 'Flay'.
+class (G.Generic a, GRecord (G.Rep a)) => Record a
+instance {-# OVERLAPPABLE #-} (G.Generic a, GRecord (G.Rep a)) => Record a
+
+class GRecord (a :: * -> *) where
+instance GRecord (G.K1 r x)
+instance GRecord x => GRecord (G.M1 i j x)
+instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
+
+--------------------------------------------------------------------------------
+
+-- | Witness that @a@ can be constructed out of thin air.
+--
+-- Note: This is intended to work well with for @a@s that could fit the @s@
+-- parameter to a 'Flay'.
+class (Record a, GUnit (G.Rep a)) => Unit a
+instance {-# OVERLAPPABLE #-} (Record a, GUnit (G.Rep a)) => Unit a
+
+-- Construct an @a@ out of thin air.
+--
+-- If you consider the @Foo@ example from above, then 'a' could be @Foo ('Const'
+-- ()@.
+unit :: Unit a => a
+unit = G.to gunit
+{-# INLINE unit #-}
+
+class GRecord f => GUnit (f :: * -> *) where
+  gunit :: f p
+instance GUnit (G.K1 i (Const () x)) where
+  gunit = G.K1 (Const ())
+  {-# INLINE gunit #-}
+instance GUnit f => GUnit (G.M1 i c f) where
+  gunit = G.M1 gunit
+  {-# INLINE gunit #-}
+instance (GUnit f, GUnit g) => GUnit (f G.:*: g) where
+  gunit = gunit G.:*: gunit
+  {-# INLINE gunit #-}
+
 --------------------------------------------------------------------------------
 
 -- | Ensure that @x@ satisfies all of the constraints listed in @cs@.
