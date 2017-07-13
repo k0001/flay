@@ -1,12 +1,13 @@
-{ mkDerivation, base, constraints, stdenv, tasty, tasty-quickcheck
+{ mkDerivation, base, constraints, ghc-prim, stdenv, tasty
+, tasty-quickcheck
 }:
 mkDerivation {
   pname = "flay";
   version = "0.1";
   src = ./.;
-  libraryHaskellDepends = [ base constraints ];
+  libraryHaskellDepends = [ base constraints ghc-prim ];
   testHaskellDepends = [ base tasty tasty-quickcheck ];
   homepage = "https://github.com/k0001/flay";
-  description = "Work on your datatype without knowing much about it";
+  description = "Work on your datatype without knowing its shape nor its contents";
   license = stdenv.lib.licenses.bsd3;
 }

@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
@@ -44,6 +45,8 @@ module Flay
  , collect
  , collect1
  , collect'
+ , zip
+ , zip1
  , unit
  , Unit
  , GUnit
@@ -51,13 +54,21 @@ module Flay
  , GRecord
  -- ** Re-exports
  , Dict(Dict)
+ , Product(Pair)
  ) where
 
 import Control.Monad (join)
-import Data.Functor.Identity (runIdentity)
+import Control.Monad.ST (ST, runST)
 import Data.Functor.Const (Const(Const, getConst))
+import Data.Functor.Identity (runIdentity)
+import Data.Functor.Product (Product(Pair))
 import Data.Constraint (Constraint, Dict(Dict))
+import Data.STRef (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified GHC.Generics as G
+import GHC.Prim (Any)
+import Prelude hiding (zip)
+import Unsafe.Coerce (unsafeCoerce)
+
 
 --------------------------------------------------------------------------------
 
@@ -572,6 +583,61 @@ instance GUnit f => GUnit (G.M1 i c f) where
 instance (GUnit f, GUnit g) => GUnit (f G.:*: g) where
   gunit = gunit G.:*: gunit
   {-# INLINE gunit #-}
+
+--------------------------------------------------------------------------------
+
+-- | Zip two 'Flayable1's together.
+
+-- This is safer, but less general than 'unsafeZip''.
+--
+-- TODO: Can't we have @f x -> g x -> h x@?
+zip1
+  :: (Record (s f), Flayable1 Trivial s)
+  => (forall x. f x -> f x -> g x)
+  -> s f
+  -> s f
+  -> s g  -- ^
+zip1 h = unsafeZip' h flay1 flay1
+{-# INLINABLE zip1 #-}
+
+-- | Zip two 'Flayable's together.
+
+-- This is safer, but less general than 'unsafeZip''.
+--
+-- TODO: Can't we have @f x -> g x -> h x@?
+zip
+  :: ( Record s
+     , Flayable Trivial s t0 f (Const ())
+     , Flayable Trivial s t1 f g )
+  => (forall x. f x -> f x -> g x)
+  -> s
+  -> s
+  -> t1   -- ^
+zip h = unsafeZip' h flay flay
+{-# INLINABLE zip #-}
+
+-- | TODO Make sure the two flays target the same things.
+unsafeZip'
+  :: forall s t0 t1 f g h
+  .  Record s
+  => (forall x. f x -> g x -> h x)
+  -> (Flay Trivial s t0 f (Const ()))
+  -> (Flay Trivial s t1 g h)
+  -> s
+  -> s
+  -> t1
+unsafeZip' pair fl0 fl1 = \s0 s1 -> runST $ do
+    r <- newSTRef (collect' fl0 f1 s0)
+    fl1 (f2 r) s1
+  where
+    f1 :: Dict (Trivial a) -> f a -> [Any]
+    f1 = \Dict fa -> [unsafeCoerce fa :: Any]
+    f2 :: STRef z [Any] -> Dict (Trivial a) -> g a -> ST z (h a)
+    f2 r = \Dict !ga -> do
+       (x:xs) <- readSTRef r
+       writeSTRef r xs
+       let !fa = unsafeCoerce (x :: Any) :: f a
+       pure $! pair fa ga
 
 --------------------------------------------------------------------------------
 
