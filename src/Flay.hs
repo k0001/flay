@@ -47,21 +47,17 @@ module Flay
  , collect'
  , zip
  , zip1
- , unit
- , Unit
- , GUnit(gunit)
- , Record
- , GRecord
+ , terminal
+ , Terminal
+ , GTerminal(gterminal)
  -- ** Re-exports
  , Dict(Dict)
- , Product(Pair)
  ) where
 
 import Control.Monad (join)
 import Control.Monad.ST (ST, runST)
 import Data.Functor.Const (Const(Const, getConst))
 import Data.Functor.Identity (runIdentity)
-import Data.Functor.Product (Product(Pair))
 import Data.Constraint (Constraint, Dict(Dict))
 import Data.STRef (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified GHC.Generics as G
@@ -580,49 +576,37 @@ collect1
   -> b    -- ^
 collect1 = collect' flay1
 {-# INLINE collect1 #-}
---------------------------------------------------------------------------------
-
--- | Witness that @a@ is a record type (i.e., it has only one constructor and
--- some at least one field containing another value.
---
--- Note: This is intended to work well with for @a@s that could fit the @s@
--- parameter to a 'Flay'.
-class (G.Generic a, GRecord (G.Rep a)) => Record a
-instance {-# OVERLAPPABLE #-} (G.Generic a, GRecord (G.Rep a)) => Record a
-
-class GRecord (a :: * -> *) where
-instance GRecord (G.K1 r x)
-instance GRecord x => GRecord (G.M1 i j x)
-instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
 
 --------------------------------------------------------------------------------
 
--- | Witness that @a@ can be constructed out of thin air.
+-- | Witness that @a@ is a terminal object.
 --
 -- Note: This is intended to work well with for @a@s that could fit the @s@
--- parameter to a 'Flay'.
-class (Record a, GUnit (G.Rep a)) => Unit a
-instance {-# OVERLAPPABLE #-} (Record a, GUnit (G.Rep a)) => Unit a
+-- parameter to a 'Flay'. We use this both to build an @a@, and to /very
+-- handwavily/ convey the idea that @a@ is a produc or record type.
+class Terminal a where
+  terminal :: a
+instance Terminal () where
+  terminal = ()
+  {-# INLINE terminal #-}
+instance {-# OVERLAPPABLE #-} (G.Generic a, GTerminal (G.Rep a)) => Terminal a where
+  terminal = G.to gterminal
+  {-# INLINE terminal #-}
+instance Terminal (Const () a) where
+  terminal = Const ()
+  {-# INLINE terminal #-}
 
--- Construct an @a@ out of thin air.
---
--- If you consider the @Foo@ example from above, then 'a' could be @Foo ('Const'
--- ()@.
-unit :: Unit a => a
-unit = G.to gunit
-{-# INLINE unit #-}
-
-class GRecord f => GUnit (f :: * -> *) where
-  gunit :: f p
-instance GUnit (G.K1 i (Const () x)) where
-  gunit = G.K1 (Const ())
-  {-# INLINE gunit #-}
-instance GUnit f => GUnit (G.M1 i c f) where
-  gunit = G.M1 gunit
-  {-# INLINE gunit #-}
-instance (GUnit f, GUnit g) => GUnit (f G.:*: g) where
-  gunit = gunit G.:*: gunit
-  {-# INLINE gunit #-}
+class GTerminal (f :: * -> *) where
+  gterminal :: f p
+instance Terminal x => GTerminal (G.K1 i x) where
+  gterminal = G.K1 terminal
+  {-# INLINE gterminal #-}
+instance GTerminal f => GTerminal (G.M1 i c f) where
+  gterminal = G.M1 gterminal
+  {-# INLINE gterminal #-}
+instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
+  gterminal = gterminal G.:*: gterminal
+  {-# INLINE gterminal #-}
 
 --------------------------------------------------------------------------------
 
@@ -632,7 +616,7 @@ instance (GUnit f, GUnit g) => GUnit (f G.:*: g) where
 --
 -- TODO: Can't we have @f x -> g x -> h x@?
 zip1
-  :: (Record (s f), Flayable1 c s)
+  :: (Terminal (s f), Flayable1 c s)
   => (forall x. Dict (c x) -> f x -> f x -> g x)
   -> s f
   -> s f
@@ -646,7 +630,7 @@ zip1 h = unsafeZip' h flay1 flay1
 --
 -- TODO: Can't we have @f x -> g x -> h x@?
 zip
-  :: ( Record s
+  :: ( Terminal s
      , Flayable c s t0 f (Const ())
      , Flayable c s t1 f g )
   => (forall x. Dict (c x) -> f x -> f x -> g x)
@@ -659,7 +643,7 @@ zip h = unsafeZip' h flay flay
 -- | TODO Make sure the two flays target the same things.
 unsafeZip'
   :: forall c s t0 t1 f g h
-  .  Record s
+  .  Terminal s
   => (forall x. Dict (c x) -> f x -> g x -> h x)
   -> (Flay c s t0 f (Const ()))
   -> (Flay c s t1 g h)
