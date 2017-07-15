@@ -3,7 +3,8 @@
 * BREAKING CHANGE: The `m` parameter in in `Flay` and `Flayable` has been
   existentialized, to be chosen by the caller.
 
-* Added `Flayable1`, `trivial1`, `collect1`, `Terminal`, `zip1`, `zip`, `GFlay1`.
+* Added `Flayable1`, `trivial1`, `collect1`, `Terminal`, `GTerminal`, `zip1`,
+  `zip`, `GFlay1`, `Record`, `GRecord`.
 
 
 # Version 0.1

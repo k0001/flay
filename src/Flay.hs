@@ -47,6 +47,8 @@ module Flay
  , collect'
  , zip
  , zip1
+ , Record
+ , GRecord
  , terminal
  , Terminal
  , GTerminal(gterminal)
@@ -579,11 +581,20 @@ collect1 = collect' flay1
 
 --------------------------------------------------------------------------------
 
+-- | Handwavy class of which only product or record types are supposed to be
+-- instances. This is very shitty.
+class Record a
+instance {-# OVERLAPPABLE #-} (G.Generic a, GRecord (G.Rep a)) => Record a
+
+class GRecord (a :: * -> *) where
+instance GRecord (G.K1 r x)
+instance GRecord x => GRecord (G.M1 i j x)
+instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
+
+--------------------------------------------------------------------------------
+
+
 -- | Witness that @a@ is a terminal object.
---
--- Note: This is intended to work well with for @a@s that could fit the @s@
--- parameter to a 'Flay'. We use this both to build an @a@, and to /very
--- handwavily/ convey the idea that @a@ is a produc or record type.
 class Terminal a where
   terminal :: a
 instance Terminal () where
@@ -616,7 +627,7 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 --
 -- TODO: Can't we have @f x -> g x -> h x@?
 zip1
-  :: (Terminal (s f), Flayable1 c s)
+  :: (Record (s f), Flayable1 c s)
   => (forall x. Dict (c x) -> f x -> f x -> g x)
   -> s f
   -> s f
@@ -630,7 +641,7 @@ zip1 h = unsafeZip' h flay1 flay1
 --
 -- TODO: Can't we have @f x -> g x -> h x@?
 zip
-  :: ( Terminal s
+  :: ( Record s
      , Flayable c s t0 f (Const ())
      , Flayable c s t1 f g )
   => (forall x. Dict (c x) -> f x -> f x -> g x)
@@ -643,7 +654,7 @@ zip h = unsafeZip' h flay flay
 -- | TODO Make sure the two flays target the same things.
 unsafeZip'
   :: forall c s t0 t1 f g h
-  .  Terminal s
+  .  Record s
   => (forall x. Dict (c x) -> f x -> g x -> h x)
   -> (Flay c s t0 f (Const ()))
   -> (Flay c s t1 g h)
