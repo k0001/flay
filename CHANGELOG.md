@@ -6,6 +6,8 @@
 * Added `Flayable1`, `trivial1`, `collect1`, `Terminal`, `GTerminal`, `zip1`,
   `zip`, `GFlay1`, `Record`, `GRecord`.
 
+* Made compatible with GHC 8.2.1.
+
 
 # Version 0.1
 

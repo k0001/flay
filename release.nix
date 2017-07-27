@@ -2,12 +2,11 @@
 , nixpkgs ? (import nixpkgsBootstrap {}).fetchFromGitHub {
     owner = "NixOS";
     repo = "nixpkgs";
-    rev = "100919ab5b69cbbb26886421aacc692467c7fec4"; # release-17.03
-    sha256 = "1nqiphqvxzszi0r4qq8w39x0g08wc7vaa9mfl7gi4a28bkv99781"; }
+    rev = "8dfa4721789d10fa5387c8bddf7f1725eac0c575";
+    sha256 = "0cygb2nv4xqa9dkwscvapf58qg6ibaw6ypy8srafsg0aamwxsvsh"; }
 }:
 
 let
-
 pkgs = import nixpkgs {};
 
 hsPackageSetConfig = self: super: {
@@ -18,4 +17,11 @@ ghc802 = pkgs.haskell.packages.ghc802.override {
   packageSetConfig = hsPackageSetConfig;
 };
 
-in { inherit (ghc802) flay; }
+ghc821 = pkgs.haskell.packages.ghc821.override {
+  packageSetConfig = hsPackageSetConfig;
+};
+
+in {
+  flay-ghc802 = ghc802.flay;
+  flay-ghc821 = ghc821.flay;
+}

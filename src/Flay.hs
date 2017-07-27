@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -63,9 +64,14 @@ import Data.Functor.Identity (runIdentity)
 import Data.Constraint (Constraint, Dict(Dict))
 import Data.STRef (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified GHC.Generics as G
-import GHC.Prim (Any)
 import Prelude hiding (zip)
 import Unsafe.Coerce (unsafeCoerce)
+
+#if MIN_VERSION_ghc_prim(0,5,1)
+import GHC.Types (Any)
+#else
+import GHC.Prim (Any)
+#endif
 
 
 --------------------------------------------------------------------------------

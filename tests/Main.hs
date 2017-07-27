@@ -13,6 +13,7 @@ module Main where
 import Control.Monad (join)
 import Data.Functor.Const (Const(Const))
 import Data.Functor.Identity (Identity(Identity), runIdentity)
+import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import qualified GHC.Generics as G
 import qualified Test.Tasty as Tasty
@@ -71,7 +72,7 @@ flayQux h (Qux3 a) = Qux3 <$> flayFoo h a
 
 -- TODO: See if there is a way of removing all these constraints.
 instance
-  ( GFlay' c (G.K1 G.R (Foo f)) (G.K1 G.R (Foo g)) f g
+  ( GFlay' c (G.K1 G.R (Foo f) :: * -> *) (G.K1 G.R (Foo g) :: * -> *) f g
   , c Int
   , c Bool
   ) => Flayable c (Qux f) (Qux g) f g
@@ -79,7 +80,7 @@ instance
 deriving instance (Eq (f Int), Eq (Foo f)) => Eq (Qux f)
 deriving instance (Show (f Int), Show (Foo f)) => Show (Qux f)
 
-instance (QC.Arbitrary (f Int), QC.Arbitrary (Foo f)) => QC.Arbitrary (Qux f) where
+instance (QC.Arbitrary (f Int), QC.Arbitrary (f Bool)) => QC.Arbitrary (Qux f) where
   arbitrary = QC.oneof [ Qux1 <$> QC.arbitrary <*> QC.arbitrary
                        , Qux2 <$> QC.arbitrary <*> QC.arbitrary
                        , Qux3 <$> QC.arbitrary ]
