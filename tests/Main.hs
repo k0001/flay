@@ -40,6 +40,13 @@ deriving instance (Show (f Int), Show (f Bool)) => Show (Foo f)
 instance (QC.Arbitrary (f Int), QC.Arbitrary (f Bool)) => QC.Arbitrary (Foo f) where
   arbitrary = Foo <$> QC.arbitrary <*> QC.arbitrary
 
+-- example values
+foo1 :: Applicative m => Foo m
+foo1 = Foo (pure 0) (pure False)
+
+foo2 :: Applicative m => Foo m
+foo2 = Foo (pure 1) (pure True)
+
 --------------------------------------------------------------------------------
 
 data Bar f = Bar (f Int) Int

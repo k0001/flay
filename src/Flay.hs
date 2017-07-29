@@ -628,44 +628,51 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 --------------------------------------------------------------------------------
 
 -- | Zip two 'Flayable1's together.
+--
+-- Example pairing two of the 'Foo' values seen elsewhere in this file.
+--
+-- @
+-- > foo1 :: Foo Identity
+-- Foo (Identity 0) (Identity False)
+-- > foo2 :: Foo Identity
+-- Foo (Identity 1) (Identity True)
+-- > zip1 (\(Dict :: Dict (Show x)) a b -> Pair a b) foo1 foo2 :: Foo (Product Identity Identity)
+-- Foo (Pair (Identity 0) (Identity 1)) (Pair (Identity False) (Identity True))
+-- @
 
 -- This is safer, but less general than 'unsafeZip''.
---
--- TODO: Can't we have @f x -> g x -> h x@?
 zip1
   :: (Record (s f), Flayable1 c s)
-  => (forall x. Dict (c x) -> f x -> f x -> g x)
+  => (forall x. Dict (c x) -> f x -> g x -> h x)
   -> s f
-  -> s f
-  -> s g  -- ^
+  -> s g
+  -> s h  -- ^
 zip1 h = unsafeZip' h flay1 flay1
 {-# INLINABLE zip1 #-}
 
 -- | Zip two 'Flayable's together.
 
 -- This is safer, but less general than 'unsafeZip''.
---
--- TODO: Can't we have @f x -> g x -> h x@?
 zip
   :: ( Record s
      , Flayable c s t0 f (Const ())
-     , Flayable c s t1 f g )
-  => (forall x. Dict (c x) -> f x -> f x -> g x)
+     , Flayable c s' t1 g h )
+  => (forall x. Dict (c x) -> f x -> g x -> h x)
   -> s
-  -> s
+  -> s'
   -> t1   -- ^
 zip h = unsafeZip' h flay flay
 {-# INLINABLE zip #-}
 
 -- | TODO Make sure the two flays target the same things.
 unsafeZip'
-  :: forall c s t0 t1 f g h
+  :: forall c s s' t0 t1 f g h
   .  Record s
   => (forall x. Dict (c x) -> f x -> g x -> h x)
   -> (Flay c s t0 f (Const ()))
-  -> (Flay c s t1 g h)
+  -> (Flay c s' t1 g h)
   -> s
-  -> s
+  -> s'
   -> t1
 unsafeZip' pair fl0 fl1 = \s0 s1 -> runST $ do
     r <- newSTRef (collect' fl0 f1 s0)
