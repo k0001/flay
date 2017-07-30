@@ -86,10 +86,10 @@ import GHC.Prim (Any)
 -- well, if the 'Flay' fits the type expected by 'outer').
 --
 -- When defining 'Flay' values, you should leave @c@, @f@, and @g@ fully
--- polymomrphic, as these are the most useful types of 'Flay's.
+-- polymorphic, as these are the most useful types of 'Flay's.
 --
 -- We use @'Dict' (c a) ->@ instead of @c a =>@ because the latter is often not
--- enough to satisfy the type checker. With this approach, one must explicitely
+-- enough to satisfy the type checker. With this approach, one must explicitly
 -- pattern match on the @'Dict' (c a)@ constructor in order to bring the @c a@
 -- instance to scope.  Also, it's necessary that @c@ is explicitly given a type
 -- at the 'Flay''s call site, as otherwise the type checker won't be able to
@@ -99,7 +99,7 @@ import GHC.Prim (Any)
 --
 -- /Mnemonic for @c s t f g@: Common STandard FoG./
 --
--- ==== Example 1: Removing uncertaininy
+-- ==== Example 1: Removing uncertainty
 --
 -- Consider the following types and values:
 --
@@ -172,10 +172,10 @@ import GHC.Prim (Any)
 -- 'Just' (Foo ('Right' 2) ('Right' 'True'))
 -- @
 --
--- 'Flay', among other things, is intended to generalize this pattern so that
+-- 'Flay', among other things, is intended to generalize this pattern, so that
 -- whatever choice of 'Foo', 'Maybe' or 'Identity' you make, you can use
 -- 'Applicative' this way. The easiest way to use 'Flay' is through 'trivial'',
--- which is sufficient unless we need to enforce some constrain in the target
+-- which is sufficient unless we need to enforce some constraint in the target
 -- elements wrapped in @m@ inside foo (we don't need this now). With 'trivial'',
 -- we could have defined @fooMToG@ this way:
 --
@@ -199,7 +199,7 @@ import GHC.Prim (Any)
 -- flayMToG fl = 'trivial'' fl ('fmap' 'pure')
 -- @
 --
--- This is the escence of 'Flay': We can work operate on the contents of a
+-- This is the esscence of 'Flay': We can work operating on the contents of a
 -- datatype @s@ targeted by a given 'Flay' /without/ knowing anything about @s@,
 -- nor about the @forall x. f x@ targets of the 'Flay'. And we do this using an
 -- principled approach relying on 'Applicative' and 'Functor'.
@@ -286,7 +286,7 @@ import GHC.Prim (Any)
 -- Notice how we had to give an explicit type to our function @h@: This is
 -- because can't infer our @'Read' a@ constraint. You will always need to
 -- explicitly type the received @'Dict'@ unless the @c@ argument to 'Flay' has
--- been explicitely by other means (like in the definition of 'trivial'', where
+-- been explicitly by other means (like in the definition of 'trivial'', where
 -- we don't have to explicitly type 'Dict' because @c ~ 'Trivial'@ according to
 -- the top level signature of 'trivial'').
 --
@@ -357,7 +357,7 @@ outer fl = join . trivial' fl pure
 -- | Default 'Flay' implementation for @s@ and @t@.
 --
 -- When defining 'Flayable' instances, you should leave @c@, @f@, and @g@
--- fully polymomrphic, as these are the most useful types of 'Flayables's.
+-- fully polymorphic, as these are the most useful types of 'Flayables's.
 
 -- TODO: See if `c` can be made of kind `k -> Constraint`, probably in GHC 8.2.
 class Flayable (c :: * -> Constraint) s t f g | s -> f, t -> g, s g -> t, t f -> s where
