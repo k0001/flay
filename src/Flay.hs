@@ -48,6 +48,7 @@ module Flay
  , collect'
  , zip
  , zip1
+ , unsafeZip
  , Record
  , GRecord
  , terminal
@@ -593,6 +594,7 @@ class Record a
 instance {-# OVERLAPPABLE #-} (G.Generic a, GRecord (G.Rep a)) => Record a
 
 class GRecord (a :: * -> *) where
+instance GRecord G.U1
 instance GRecord (G.K1 r x)
 instance GRecord x => GRecord (G.M1 i j x)
 instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
@@ -600,7 +602,8 @@ instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
 --------------------------------------------------------------------------------
 
 
--- | Witness that @a@ is a terminal object.
+-- | Witness that @a@ is a terminal object. That is, that @a@ can always be
+-- constructed out of thin air.
 class Terminal a where
   terminal :: a
 instance Terminal () where
@@ -632,49 +635,63 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 -- Example pairing two of the 'Foo' values seen elsewhere in this file.
 --
 -- @
--- > foo1 :: Foo Identity
--- Foo (Identity 0) (Identity False)
--- > foo2 :: Foo Identity
--- Foo (Identity 1) (Identity True)
--- > zip1 (\(Dict :: Dict (Show x)) a b -> Pair a b) foo1 foo2 :: Foo (Product Identity Identity)
--- Foo (Pair (Identity 0) (Identity 1)) (Pair (Identity False) (Identity True))
+-- > let foo1 = 'Foo' ('Data.Functor.Identity.Identity' 0) ('Data.Functor.Identity.Identity' 'False')
+-- >   :: 'Foo' 'Data.Functor.Identity.Identity'
+--
+-- > let foo2 = 'Foo' ('Just' 1) 'Nothing'
+-- >   :: 'Foo' 'Maybe'
+--
+-- > 'zip1' (\('Dict' :: 'Dict' ('Trivial' x)) a b -> 'Data.Functor.Product.Pair' a b) foo1 foo2
+-- >   :: 'Foo' ('Data.Functor.Product.Product' 'Data.Functor.Identity.Identity' 'Maybe')
+-- 'Foo' ('Data.Functor.Product.Pair' ('Data.Functor.Identity.Identity' 0) ('Just' 1)) ('Data.Functor.Product.Pair' ('Data.Functor.Identity.Identity' 'False') 'Nothing')
+--
+-- > 'zip1' (\('Dict' :: 'Dict' ('Show' x)) ('Data.Functor.Identity.Identity' a) yb -> case yb of
+-- >           'Nothing' -> 'Const' ('show' a)
+-- >           'Just' b  -> 'Const' ('show' (a, b)) )
+-- >      foo1 foo2
+-- >   :: Foo ('Const' 'String')
+-- Foo ('Const' \"(0,1)\") ('Const' \"False\")
 -- @
-
--- This is safer, but less general than 'unsafeZip''.
+--
+-- Note: 'zip1' is safer but less general than 'unsafeZip'.
 zip1
   :: (Record (s f), Flayable1 c s)
   => (forall x. Dict (c x) -> f x -> g x -> h x)
   -> s f
   -> s g
   -> s h  -- ^
-zip1 h = unsafeZip' h flay1 flay1
+zip1 h = unsafeZip flay1 flay1 h
 {-# INLINABLE zip1 #-}
 
 -- | Zip two 'Flayable's together.
-
--- This is safer, but less general than 'unsafeZip''.
+--
+-- 'zip' is like 'zip1', but for 'Flayable's.
+--
+-- Note: 'zip' is safer but less general than 'unsafeZip'.
 zip
-  :: ( Record s
-     , Flayable c s t0 f (Const ())
-     , Flayable c s' t1 g h )
+  :: ( Record s0
+     , Flayable c s0 t0 f (Const ())
+     , Flayable c s1 t1 g h )
   => (forall x. Dict (c x) -> f x -> g x -> h x)
-  -> s
-  -> s'
+  -> s0
+  -> s1
   -> t1   -- ^
-zip h = unsafeZip' h flay flay
+zip h = unsafeZip flay flay h
 {-# INLINABLE zip #-}
 
--- | TODO Make sure the two flays target the same things.
-unsafeZip'
-  :: forall c s s' t0 t1 f g h
-  .  Record s
-  => (forall x. Dict (c x) -> f x -> g x -> h x)
-  -> (Flay c s t0 f (Const ()))
-  -> (Flay c s' t1 g h)
-  -> s
-  -> s'
+-- | Unsafe version of 'zip' that doesn't guarantee that the given 'Flay's
+-- target the same values. 'zip' makes this function safe by simply using
+-- 'flay' twice.
+unsafeZip
+  :: forall c s0 s1 t0 t1 f g h
+  .  Record s0
+  => (Flay c s0 t0 f (Const ()))
+  -> (Flay c s1 t1 g h)
+  -> (forall x. Dict (c x) -> f x -> g x -> h x)
+  -> s0
+  -> s1
   -> t1
-unsafeZip' pair fl0 fl1 = \s0 s1 -> runST $ do
+unsafeZip fl0 fl1 pair = \s0 s1 -> runST $ do
     r <- newSTRef (collect' fl0 f1 s0)
     fl1 (f2 r) s1
   where
