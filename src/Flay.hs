@@ -18,7 +18,7 @@
 -- unqualified:
 --
 -- @
--- import Flay (Flay, Flayable(flay), Dict(Dict))
+-- import Flay (Flay, Flayable(flay), gflay, Dict(Dict))
 -- @
 --
 -- The rest of the names, qualified:
@@ -29,7 +29,6 @@
 module Flay
  ( Flay
  , inner
- , outer
  -- * Flayable
  , Flayable(flay)
  , Flayable1(flay1)
@@ -58,7 +57,6 @@ module Flay
  , Dict(Dict)
  ) where
 
-import Control.Monad (join)
 import Control.Monad.ST (ST, runST)
 import Data.Functor.Const (Const(Const, getConst))
 import Data.Functor.Identity (runIdentity)
@@ -82,8 +80,7 @@ import GHC.Prim (Any)
 -- @(forall a. c a => f a -> m (g a))@ to targeted occurences of @f a@ inside
 -- @s@.
 --
--- A 'Flay' must obey the 'inner' identity law (and 'outer' identity law as
--- well, if the 'Flay' fits the type expected by 'outer').
+-- A 'Flay' must obey the 'inner' identity law.
 --
 -- When defining 'Flay' values, you should leave @c@, @f@, and @g@ fully
 -- polymorphic, as these are the most useful types of 'Flay's.
@@ -343,44 +340,30 @@ type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 inner :: Flay Trivial s s f f -> s -> s
 inner fl = runIdentity . trivial' fl pure
 
--- | Outer identity law:
---
--- @
--- (\\fl -> 'join' . 'trivial'' fl 'pure') = 'id'
--- @
-outer :: Monad m => Flay Trivial (m x) (m x) m m -> m x -> m x
-outer fl = join . trivial' fl pure
-
-
 --------------------------------------------------------------------------------
 
 -- | Default 'Flay' implementation for @s@ and @t@.
 --
 -- When defining 'Flayable' instances, you should leave @c@, @f@, and @g@
--- fully polymorphic, as these are the most useful types of 'Flayables's.
-
--- TODO: See if `c` can be made of kind `k -> Constraint`, probably in GHC 8.2.
-class Flayable (c :: * -> Constraint) s t f g | s -> f, t -> g, s g -> t, t f -> s where
-  -- | If @s@ and @t@ are instances of 'G.Generic', then 'flay' gets a default
-  -- implementation. For example, provided the @Foo@ datatype shown in the
-  -- documentation for 'Flay' had a 'G.Generic' instance, then the following
-  -- 'Flayable' instance would get a default implementation for 'flay':
+-- fully polymomrphic, as these are the most useful types of 'Flayables's.
+class Flayable (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) | s -> f, t -> g, s g -> t, t f -> s where
+  -- | If @s@ and @t@ are instances of 'G.Generic', then 'gflay' can be used as
+  -- default implementation for 'flay'. For example, provided the @Foo@ datatype
+  -- shown in the documentation for 'Flay' had a 'G.Generic' instance, then the
+  -- following 'Flayable' instance would get a default implementation for
+  -- 'flay':
   --
   -- @
-  -- instance (c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g
+  -- instance (c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g where
+  --   'flay' = 'gflay'
   -- @
   --
   -- Notice that 'flay' can be defined in terms of 'flay1' as well.
-  flay ::  Flay c s t f g
-  -- | By default, 'flay' is defined in terms of 'gflay'
-  default flay :: GFlay c s t f g => Flay c s t f g
-  flay = gflay
-  {-# INLINE flay #-}
-
--- | Isomorphic to @c a => f a -> m (g a)@.
-instance {-# OVERLAPPABLE #-} c a => Flayable c (f a) (g a) f g where
-  flay = \h fa -> h Dict fa
-  {-# INLINE flay #-}
+  --
+  -- /Implementors note:/ Unfortunately, due to some strange bug in GHC, we
+  -- can't use @DefaultSignatures@ to say @'flay' = 'gflay'@, because when doing
+  -- that the kind of @c@ infers incorrectly.
+  flay :: Flay c s t f g
 
 --------------------------------------------------------------------------------
 
@@ -392,7 +375,7 @@ instance {-# OVERLAPPABLE #-} c a => Flayable c (f a) (g a) f g where
 -- which is why you'll need to specify both 'Flayable1' and 'Flayable'
 -- instances. Notice, however, that 'flay1' can be defined in terms of
 -- 'flay' and vice-versa, so this should be very mechanical.
-class Flayable1 (c :: * -> Constraint) (r :: (* -> *) -> *) where
+class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
   -- | If @r f@ and @r g@ are instances of 'G.Generic', then 'flay1' gets a
   -- default implementation. For example, provided the @Foo@ datatype shown in
   -- the documentation for 'Flay' had a 'G.Generic' instance, then the following
@@ -467,15 +450,16 @@ trivial1 = trivial' flay1
 
 -- | Convenience 'Constraint' for satisfying basic 'GFlay'' needs for @s@ and @t@.
 class (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
-  => GFlay (c :: k -> Constraint) s t f g
+  => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 instance (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
-  => GFlay (c :: k -> Constraint) s t f g
+  => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 
-gflay :: GFlay c s t f g => Flay c s t f g
+
+gflay :: GFlay c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 gflay = \h s -> G.to <$> gflay' h (G.from s)
 {-# INLINE gflay #-}
 
-class GFlay' (c :: k -> Constraint) s t f g where
+class GFlay' (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) where
   gflay' :: Flay c (s p) (t p) f g
 
 instance GFlay' c G.V1 G.V1 f g where
@@ -511,15 +495,15 @@ instance (GFlay' c sl tl f g, GFlay' c sr tr f g)
 
 -- | Convenience 'Constraint' for satisfying basic 'GFlay1'' needs for @s@ and @t@.
 class (G.Generic s, G.Generic t, GFlay1' c (G.Rep s) (G.Rep t) f g)
-  => GFlay1 (c :: k -> Constraint) s t f g
+  => GFlay1 (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 instance (G.Generic s, G.Generic t, GFlay1' c (G.Rep s) (G.Rep t) f g)
-  => GFlay1 (c :: k -> Constraint) s t f g
+  => GFlay1 (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 
-gflay1 :: GFlay1 c s t f g => Flay c s t f g
+gflay1 :: GFlay1 c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 gflay1 = \h s -> G.to <$> gflay1' h (G.from s)
 {-# INLINE gflay1 #-}
 
-class GFlay1' (c :: k -> Constraint) s t f g where
+class GFlay1' (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) where
   gflay1' :: Flay c (s p) (t p) f g
 
 instance GFlay1' c G.V1 G.V1 f g where

@@ -31,7 +31,7 @@ data Foo f = Foo (f Int) (f Bool)
 flayFoo :: (c Int, c Bool) => Flay c (Foo f) (Foo g) f g
 flayFoo h (Foo a b) = Foo <$> h Dict a <*> h Dict b
 
-instance (c Int, c Bool) => Flayable c (Foo f) (Foo g) f g
+instance (c Int, c Bool) => Flayable c (Foo f) (Foo g) f g where flay = gflay
 instance (c Int, c Bool) => Flayable1 c Foo
 
 deriving instance (Eq (f Int), Eq (f Bool)) => Eq (Foo f)
@@ -77,12 +77,10 @@ flayQux h (Qux1 a b) = Qux1 <$> h Dict a <*> pure b
 flayQux h (Qux2 a b) = Qux2 <$> h Dict a <*> h Dict b
 flayQux h (Qux3 a) = Qux3 <$> flayFoo h a
 
--- TODO: See if there is a way of removing all these constraints.
-instance
-  ( GFlay' c (G.K1 G.R (Foo f) :: * -> *) (G.K1 G.R (Foo g) :: * -> *) f g
-  , c Int
-  , c Bool
-  ) => Flayable c (Qux f) (Qux g) f g
+instance (c Int , c Bool) => Flayable c (Qux f) (Qux g) f g where
+  flay h (Qux1 fa b) = Qux1 <$> h Dict fa <*> pure b
+  flay h (Qux2 fa fb) = Qux2 <$> h Dict fa <*> h Dict fb
+  flay h (Qux3 foo) = Qux3 <$> flay h foo
 
 deriving instance (Eq (f Int), Eq (Foo f)) => Eq (Qux f)
 deriving instance (Show (f Int), Show (Foo f)) => Show (Qux f)
@@ -111,9 +109,6 @@ tt = Tasty.testGroup "main"
   , QC.testProperty "Flayable: Qux: inner identity law" $
       QC.forAll QC.arbitrary $ \(qux :: Qux Maybe) ->
          qux === inner flay qux
-  , QC.testProperty "Flayable: outer identity law" $
-      QC.forAll QC.arbitrary $ \(ia :: Identity Int) ->
-         ia === outer flay ia
   , QC.testProperty "collectShow: Foo: flayFoo" $
       QC.forAll QC.arbitrary $ \foo@(Foo (Identity a) (Identity b)) ->
          [show a, show b] === collectShow' flayFoo foo
