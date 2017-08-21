@@ -387,8 +387,8 @@ class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
   --
   -- Notice that 'flay1' can be defined in terms of 'flay' as well.
   flay1 :: Flay c (r f) (r g) f g
-  default flay1 :: GFlay1 c (r f) (r g) f g => Flay c (r f) (r g) f g
-  flay1 = gflay1
+  default flay1 :: GFlay c (r f) (r g) f g => Flay c (r f) (r g) f g
+  flay1 = gflay
   {-# INLINE flay1 #-}
 
 --------------------------------------------------------------------------------
@@ -470,10 +470,6 @@ instance c a => GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
   gflay' h (G.K1 fa) = G.K1 <$> h Dict fa
   {-# INLINE gflay' #-}
 
-instance {-# OVERLAPPABLE #-} GFlay' c (G.K1 r x) (G.K1 r x) f g where
-  gflay' _ x = pure x
-  {-# INLINE gflay' #-}
-
 instance (GFlay' c s t f g)
   => GFlay' c (G.M1 i j s) (G.M1 i j t) f g where
   gflay' h (G.M1 sp) = G.M1 <$> gflay' h sp
@@ -493,45 +489,6 @@ instance (GFlay' c sl tl f g, GFlay' c sr tr f g)
 
 --------------------------------------------------------------------------------
 
--- | Convenience 'Constraint' for satisfying basic 'GFlay1'' needs for @s@ and @t@.
-class (G.Generic s, G.Generic t, GFlay1' c (G.Rep s) (G.Rep t) f g)
-  => GFlay1 (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
-instance (G.Generic s, G.Generic t, GFlay1' c (G.Rep s) (G.Rep t) f g)
-  => GFlay1 (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
-
-gflay1 :: GFlay1 c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
-gflay1 = \h s -> G.to <$> gflay1' h (G.from s)
-{-# INLINE gflay1 #-}
-
-class GFlay1' (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) where
-  gflay1' :: Flay c (s p) (t p) f g
-
-instance GFlay1' c G.V1 G.V1 f g where
-  gflay1' _ _ = undefined -- unreachable
-  {-# INLINE gflay1' #-}
-
-instance c a => GFlay1' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
-  gflay1' h (G.K1 fa) = G.K1 <$> h Dict fa
-  {-# INLINE gflay1' #-}
-
-instance (GFlay1' c s t f g)
-  => GFlay1' c (G.M1 i j s) (G.M1 i j t) f g where
-  gflay1' h (G.M1 sp) = G.M1 <$> gflay1' h sp
-  {-# INLINE gflay1' #-}
-
-instance (GFlay1' c sl tl f g, GFlay1' c sr tr f g)
-  => GFlay1' c (sl G.:*: sr) (tl G.:*: tr) f g where
-  gflay1' h (slp G.:*: srp) = (G.:*:) <$> gflay1' h slp <*> gflay1' h srp
-  {-# INLINE gflay1' #-}
-
-instance (GFlay1' c sl tl f g, GFlay1' c sr tr f g)
-  => GFlay1' c (sl G.:+: sr) (tl G.:+: tr) f g where
-  gflay1' h x = case x of
-    G.L1 slp -> G.L1 <$> gflay1' h slp
-    G.R1 srp -> G.R1 <$> gflay1' h srp
-  {-# INLINE gflay1' #-}
-
---------------------------------------------------------------------------------
 -- | Collect all of the @f a@ of the given 'Flay' into a 'Monoid' @b@.
 --
 -- Example usage, given 'Foo' and 'flayFoo' examples given in the documentation

@@ -8,7 +8,7 @@
   in new `Flayable` instances doesn't work.
 
 * Added `Flayable1`, `trivial1`, `collect1`, `Terminal`, `GTerminal`, `zip1`,
-  `zip`, `GFlay1`, `Record`, `GRecord`.
+  `zip`, `Record`, `GRecord`.
 
 * Removed `outer`.
 
