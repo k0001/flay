@@ -1,2 +1,2 @@
-{ ghc-ver ? "821" }:
-(import ./default.nix { inherit ghc-ver; }).env
+{ compiler ? "ghc822" }:
+(import ./release.nix {}).${compiler}.flay.env

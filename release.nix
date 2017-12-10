@@ -1,9 +1,9 @@
 { nixpkgsBootstrap ? <nixpkgs>
 , nixpkgs ? (import nixpkgsBootstrap {}).fetchFromGitHub {
     owner = "NixOS";
-    repo = "nixpkgs";
-    rev = "8dfa4721789d10fa5387c8bddf7f1725eac0c575";
-    sha256 = "0cygb2nv4xqa9dkwscvapf58qg6ibaw6ypy8srafsg0aamwxsvsh"; }
+    repo = "nixpkgs-channels";
+    rev = "3eccd0b11d176489d69c778f2fcb544438f3ab56"; # unstable, dec 4 2017
+    sha256 = "1i3p5m0pnn86lzni5y1win0sacckw3wlg9kqaw15nszhykgz22zq"; }
 }:
 
 let
@@ -13,15 +13,18 @@ hsPackageSetConfig = self: super: {
   flay = self.callPackage (import ./pkg.nix) {};
 };
 
-ghc802 = pkgs.haskell.packages.ghc802.override {
-  packageSetConfig = hsPackageSetConfig;
+x = {
+  ghc802 = pkgs.haskell.packages.ghc802.override { packageSetConfig = hsPackageSetConfig; };
+  ghc822 = pkgs.haskell.packages.ghc822.override { packageSetConfig = hsPackageSetConfig; };
 };
 
-ghc821 = pkgs.haskell.packages.ghc821.override {
-  packageSetConfig = hsPackageSetConfig;
-};
+in rec {
+  ghc802 = { inherit (x.ghc802) flay; };
+  ghc822 = { inherit (x.ghc822) flay; };
 
-in {
-  flay-ghc802 = ghc802.flay;
-  flay-ghc821 = ghc821.flay;
+  everything = pkgs.releaseTools.aggregate {
+    name = "everything";
+    meta.description = "Every job in release.nix";
+    constituents = [ ghc802.flay ghc822.flay ];
+  };
 }

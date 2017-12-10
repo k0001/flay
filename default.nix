@@ -1,2 +1,2 @@
-{ ghc-ver ? "821" }:
-(import ./release.nix {}).${"flay-ghc" + ghc-ver}
+{ compiler ? "ghc822" }:
+(import ./release.nix {}).${compiler}.flay
