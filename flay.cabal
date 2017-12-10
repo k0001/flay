@@ -1,17 +1,17 @@
 name: flay
-version: 0.1
+version: 0.2
 author: Renzo Carbonara
 maintainer: renλren!zone
 copyright: Renzo Carbonara 2017
 license: BSD3
 license-file: LICENSE.txt
 extra-source-files: README.md CHANGELOG.md pkg.nix shell.nix default.nix release.nix
-category: Data
+category: Data, Generics
 build-type: Simple
 cabal-version: >=1.18
-synopsis: Work on your datatype without knowing its shape nor its contents.
+synopsis: Work generically on your datatype without knowing its shape nor its contents.
 description:
-  Work on your datatype without knowing its shape nor its contents using
+  Work generically on your datatype without knowing its shape nor its contents using
   a principlied approach.
 homepage: https://github.com/k0001/flay
 bug-reports: https://github.com/k0001/flay/issues

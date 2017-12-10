@@ -12,7 +12,7 @@
 
 * Removed `outer`.
 
-* Made compatible with GHC 8.2.1.
+* Made compatible with GHC 8.2.2.
 
 
 # Version 0.1

@@ -1,9 +1,8 @@
-{ mkDerivation, base, constraints, ghc-prim, stdenv, tasty
-, tasty-quickcheck
+{ mkDerivation, base, constraints, ghc-prim, stdenv, tasty, tasty-quickcheck
 }:
 mkDerivation {
   pname = "flay";
-  version = "0.1";
+  version = "0.2";
   src = ./.;
   libraryHaskellDepends = [ base constraints ghc-prim ];
   testHaskellDepends = [ base tasty tasty-quickcheck ];
