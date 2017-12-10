@@ -59,7 +59,7 @@ module Flay
 
 import Control.Monad.ST (ST, runST)
 import Data.Functor.Const (Const(Const, getConst))
-import Data.Functor.Identity (runIdentity)
+import Data.Functor.Identity (Identity(runIdentity))
 import Data.Constraint (Constraint, Dict(Dict))
 import Data.STRef (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified GHC.Generics as G
@@ -530,7 +530,7 @@ collect1 = collect' flay1
 --------------------------------------------------------------------------------
 
 -- | Handwavy class of which only product or record types are supposed to be
--- instances. This is very shitty.
+-- instances.
 class Record a
 instance {-# OVERLAPPABLE #-} (G.Generic a, GRecord (G.Rep a)) => Record a
 
@@ -631,7 +631,7 @@ unsafeZip
   -> (forall x. Dict (c x) -> f x -> g x -> h x)
   -> s0
   -> s1
-  -> t1
+  -> t1  -- ^
 unsafeZip fl0 fl1 pair = \s0 s1 -> runST $ do
     r <- newSTRef (collect' fl0 f1 s0)
     fl1 (f2 r) s1
