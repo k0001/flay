@@ -2,7 +2,7 @@
 }:
 mkDerivation {
   pname = "flay";
-  version = "0.2";
+  version = "0.2.0.1";
   src = ./.;
   libraryHaskellDepends = [ base constraints ghc-prim ];
   testHaskellDepends = [ base tasty tasty-quickcheck ];

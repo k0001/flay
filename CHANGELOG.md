@@ -1,3 +1,8 @@
+# Version 0.2.0.1
+
+* Added `Terminal` instances for `Maybe` and `[]`.
+
+
 # Version 0.2
 
 * BREAKING CHANGE: The `m` parameter in in `Flay` and `Flayable` has been
