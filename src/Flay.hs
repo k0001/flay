@@ -601,7 +601,7 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 zip1
   :: ( Monad m, Record (s f), Typeable f
      , Flayable1 (All '[c, Typeable]) s)
-  => (forall x. Dict (All '[c, Typeable] x) -> f x -> g x -> m (h x))
+  => (forall x. Dict (c x) -> f x -> g x -> m (h x))
   -> s f
   -> s g
   -> m (Maybe (s h))  -- ^
@@ -619,7 +619,7 @@ zip
   :: ( Monad m, Record s0, Typeable f
      , Flayable (All '[c, Typeable]) s0 t0 f (Const ())
      , Flayable (All '[c, Typeable]) s1 t1 g h )
-  => (forall x. Dict (All '[c, Typeable] x) -> f x -> g x -> m (h x))
+  => (forall x. Dict (c x) -> f x -> g x -> m (h x))
   -> s0
   -> s1
   -> m (Maybe t1)   -- ^
@@ -636,7 +636,7 @@ unsafeZip
   .  (Monad m, Record s0, Typeable f)
   => (Flay (All '[c, Typeable]) s0 t0 f (Const ()))
   -> (Flay (All '[c, Typeable]) s1 t1 g h)
-  -> (forall x. Dict (All '[c, Typeable] x) -> f x -> g x -> m (h x))
+  -> (forall x. Dict (c x) -> f x -> g x -> m (h x))
   -> s0
   -> s1
   -> m (Maybe t1)  -- ^
