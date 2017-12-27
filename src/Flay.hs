@@ -62,6 +62,7 @@ import Control.Monad.Trans.State (StateT(StateT), evalStateT)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
 import Data.Constraint (Constraint, Dict(Dict))
 import Data.Dynamic (Dynamic, toDyn, fromDynamic)
+import Data.Functor.Product (Product(Pair))
 import Data.Functor.Const (Const(Const, getConst))
 import Data.Functor.Identity (Identity(runIdentity))
 import Data.Typeable (Typeable)
@@ -537,7 +538,6 @@ instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
 
 --------------------------------------------------------------------------------
 
-
 -- | Witness that @a@ is a terminal object. That is, that @a@ can always be
 -- constructed out of thin air.
 class Terminal a where
@@ -599,13 +599,12 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 --
 -- Note: 'zip1' is safer but less general than 'unsafeZip'.
 zip1
-  :: ( Monad m, Record (s f), Typeable f
-     , Flayable1 (All '[c, Typeable]) s)
+  :: (Monad m, Record (s f), Typeable f, Flayable1 c s, Flayable1 Typeable s)
   => (forall x. Dict (c x) -> f x -> g x -> m (h x))
   -> s f
   -> s g
   -> m (Maybe (s h))  -- ^
-zip1 h = unsafeZip flay1 flay1 h
+zip1 h = unsafeZip flay1 flay1 flay1 h
 {-# INLINABLE zip1 #-}
 
 -- | Zip two 'Flayable's together.
@@ -616,40 +615,48 @@ zip1 h = unsafeZip flay1 flay1 h
 --
 -- Note: 'zip' is safer but less general than 'unsafeZip'.
 zip
-  :: ( Monad m, Record s0, Typeable f
-     , Flayable (All '[c, Typeable]) s0 t0 f (Const ())
-     , Flayable (All '[c, Typeable]) s1 t1 g h )
+  :: ( Monad m, Record s1, Typeable f
+     , Flayable Typeable s1 t1 f (Const ())
+     , Flayable Typeable s2 t2 g (Product f g)
+     , Flayable c t2 t3 (Product f g) h )
   => (forall x. Dict (c x) -> f x -> g x -> m (h x))
-  -> s0
   -> s1
-  -> m (Maybe t1)   -- ^
-zip h = unsafeZip flay flay h
+  -> s2
+  -> m (Maybe t3)   -- ^
+zip h = unsafeZip flay flay flay h
 {-# INLINABLE zip #-}
 
 -- | Unsafe version of 'zip' that doesn't guarantee that the given 'Flay's
--- target the same values. 'zip' makes this function safe by simply using
--- 'flay' twice.
+-- target the same values. 'zip' and 'zip1' make this function safe by simply
+-- using 'flay' or 'flay1' three times.
 --
 -- Returns 'Nothing' in case the indivual target types do not match.
+
+-- This implementation traverses the record three times. We could make it in
+-- two, but that pollutes the constraints a bit.
 unsafeZip
-  :: forall c s0 s1 t0 t1 f g h m
-  .  (Monad m, Record s0, Typeable f)
-  => (Flay (All '[c, Typeable]) s0 t0 f (Const ()))
-  -> (Flay (All '[c, Typeable]) s1 t1 g h)
+  :: forall c s1 s2 t1 t2 t3 f g h m
+  .  (Monad m, Record s1, Typeable f)
+  => (Flay Typeable s1 t1 f (Const ()))
+  -> (Flay Typeable s2 t2 g (Product f g))
+  -> (Flay c t2 t3 (Product f g) h)
   -> (forall x. Dict (c x) -> f x -> g x -> m (h x))
-  -> s0
   -> s1
-  -> m (Maybe t1)  -- ^
-unsafeZip fl0 fl1 pair = \s0 s1 ->
-   runMaybeT (evalStateT (fl1 f2 s1) (collect' fl0 f1 s0))
+  -> s2
+  -> m (Maybe t3)  -- ^
+unsafeZip fl1 fl2 fl3 pair = \s1 s2 -> runMaybeT $ do
+   t2 <- evalStateT (fl2 f2 s2) (collect' fl1 f1 s1)
+   lift (fl3 f3 t2)
  where
-   f1 :: Dict (All '[c, Typeable] a) -> f a -> [Dynamic]
-   f1 = \Dict fa -> [toDyn fa :: Dynamic]
-   f2 :: Dict (All '[c, Typeable] a) -> g a -> StateT [Dynamic] (MaybeT m) (h a)
+   f1 :: Dict (Typeable a) -> f a -> [Dynamic]
+   f1 = \Dict !fa -> [toDyn fa :: Dynamic]
+   f2 :: Dict (Typeable a) -> g a -> StateT [Dynamic] (MaybeT m) (Product f g a)
    f2 = \Dict !ga -> StateT $ \(x:xs) -> do
       !(fa :: f a) <- MaybeT (pure (fromDynamic x))
-      !ha <- lift (pair Dict fa ga)
-      pure (ha, xs)
+      pure (Pair fa ga, xs)
+   f3 :: Dict (c a) -> Product f g a -> m (h a)
+   f3 = \Dict (Pair fa ga) -> pair Dict fa ga
+
 
 --------------------------------------------------------------------------------
 
@@ -663,3 +670,4 @@ instance All' cs x => All cs x
 type family All' (cs :: [k -> Constraint]) (x :: k) :: Constraint where
   All' (c ': cs) x = (c x, All' cs x)
   All' '[] _ = ()
+
