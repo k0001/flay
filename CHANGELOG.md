@@ -1,4 +1,7 @@
-# Version 0.2.0.1
+# Version 0.3
+
+* `zip`, `zip1` and `unsafeZip` now take a monadic pairing function, and return
+  `Maybe` where `Nothing` happens in the target indexes do not match.
 
 * Added `Terminal` instances for `Maybe` and `[]`.
 

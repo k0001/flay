@@ -1,5 +1,5 @@
 name: flay
-version: 0.2
+version: 0.3
 author: Renzo Carbonara
 maintainer: renλren!zone
 copyright: Renzo Carbonara 2017
@@ -28,7 +28,6 @@ library
   build-depends:
     base >=4.9 && <5.0,
     constraints,
-    ghc-prim,
     transformers
 
 test-suite tests
