@@ -1,10 +1,11 @@
 { mkDerivation, base, constraints, ghc-prim, stdenv, tasty, tasty-quickcheck
+, transformers
 }:
 mkDerivation {
   pname = "flay";
   version = "0.2.0.1";
   src = ./.;
-  libraryHaskellDepends = [ base constraints ghc-prim ];
+  libraryHaskellDepends = [ base constraints ghc-prim transformers ];
   testHaskellDepends = [ base tasty tasty-quickcheck ];
   homepage = "https://github.com/k0001/flay";
   description = "Work on your datatype without knowing its shape nor its contents";

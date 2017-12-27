@@ -57,21 +57,16 @@ module Flay
  , Dict(Dict)
  ) where
 
-import Control.Monad.ST (ST, runST)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State (StateT(StateT), evalStateT)
+import Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
+import Data.Constraint (Constraint, Dict(Dict))
+import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 import Data.Functor.Const (Const(Const, getConst))
 import Data.Functor.Identity (Identity(runIdentity))
-import Data.Constraint (Constraint, Dict(Dict))
-import Data.STRef (STRef, newSTRef, readSTRef, writeSTRef)
+import Data.Typeable (Typeable)
 import qualified GHC.Generics as G
 import Prelude hiding (zip)
-import Unsafe.Coerce (unsafeCoerce)
-
-#if MIN_VERSION_ghc_prim(0,5,1)
-import GHC.Types (Any)
-#else
-import GHC.Prim (Any)
-#endif
-
 
 --------------------------------------------------------------------------------
 
@@ -600,13 +595,16 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 -- Foo ('Const' \"(0,1)\") ('Const' \"False\")
 -- @
 --
+-- Returns 'Nothing' in case the indivual target types do not match.
+--
 -- Note: 'zip1' is safer but less general than 'unsafeZip'.
 zip1
-  :: (Record (s f), Flayable1 c s)
-  => (forall x. Dict (c x) -> f x -> g x -> h x)
+  :: ( Monad m, Record (s f), Typeable f
+     , Flayable1 (All '[c, Typeable]) s)
+  => (forall x. Dict (All '[c, Typeable] x) -> f x -> g x -> m (h x))
   -> s f
   -> s g
-  -> s h  -- ^
+  -> m (Maybe (s h))  -- ^
 zip1 h = unsafeZip flay1 flay1 h
 {-# INLINABLE zip1 #-}
 
@@ -614,42 +612,44 @@ zip1 h = unsafeZip flay1 flay1 h
 --
 -- 'zip' is like 'zip1', but for 'Flayable's.
 --
+-- Returns 'Nothing' in case the indivual target types do not match.
+--
 -- Note: 'zip' is safer but less general than 'unsafeZip'.
 zip
-  :: ( Record s0
-     , Flayable c s0 t0 f (Const ())
-     , Flayable c s1 t1 g h )
-  => (forall x. Dict (c x) -> f x -> g x -> h x)
+  :: ( Monad m, Record s0, Typeable f
+     , Flayable (All '[c, Typeable]) s0 t0 f (Const ())
+     , Flayable (All '[c, Typeable]) s1 t1 g h )
+  => (forall x. Dict (All '[c, Typeable] x) -> f x -> g x -> m (h x))
   -> s0
   -> s1
-  -> t1   -- ^
+  -> m (Maybe t1)   -- ^
 zip h = unsafeZip flay flay h
 {-# INLINABLE zip #-}
 
 -- | Unsafe version of 'zip' that doesn't guarantee that the given 'Flay's
 -- target the same values. 'zip' makes this function safe by simply using
 -- 'flay' twice.
+--
+-- Returns 'Nothing' in case the indivual target types do not match.
 unsafeZip
-  :: forall c s0 s1 t0 t1 f g h
-  .  Record s0
-  => (Flay c s0 t0 f (Const ()))
-  -> (Flay c s1 t1 g h)
-  -> (forall x. Dict (c x) -> f x -> g x -> h x)
+  :: forall c s0 s1 t0 t1 f g h m
+  .  (Monad m, Record s0, Typeable f)
+  => (Flay (All '[c, Typeable]) s0 t0 f (Const ()))
+  -> (Flay (All '[c, Typeable]) s1 t1 g h)
+  -> (forall x. Dict (All '[c, Typeable] x) -> f x -> g x -> m (h x))
   -> s0
   -> s1
-  -> t1  -- ^
-unsafeZip fl0 fl1 pair = \s0 s1 -> runST $ do
-    r <- newSTRef (collect' fl0 f1 s0)
-    fl1 (f2 r) s1
-  where
-    f1 :: Dict (c a) -> f a -> [Any]
-    f1 = \Dict fa -> [unsafeCoerce fa :: Any]
-    f2 :: STRef z [Any] -> Dict (c a) -> g a -> ST z (h a)
-    f2 r = \Dict !ga -> do
-       (x:xs) <- readSTRef r
-       writeSTRef r xs
-       let !fa = unsafeCoerce (x :: Any) :: f a
-       pure $! pair Dict fa ga
+  -> m (Maybe t1)  -- ^
+unsafeZip fl0 fl1 pair = \s0 s1 ->
+   runMaybeT (evalStateT (fl1 f2 s1) (collect' fl0 f1 s0))
+ where
+   f1 :: Dict (All '[c, Typeable] a) -> f a -> [Dynamic]
+   f1 = \Dict fa -> [toDyn fa :: Dynamic]
+   f2 :: Dict (All '[c, Typeable] a) -> g a -> StateT [Dynamic] (MaybeT m) (h a)
+   f2 = \Dict !ga -> StateT $ \(x:xs) -> do
+      !(fa :: f a) <- MaybeT (pure (fromDynamic x))
+      !ha <- lift (pair Dict fa ga)
+      pure (ha, xs)
 
 --------------------------------------------------------------------------------
 
