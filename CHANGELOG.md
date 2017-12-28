@@ -5,6 +5,10 @@
 
 * Added `Terminal` instances for `Maybe` and `[]`.
 
+* Added `trivialize`.
+
+* Generalized type of `trivial'`.
+
 
 # Version 0.2
 

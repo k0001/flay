@@ -39,6 +39,7 @@ module Flay
  -- ** Utils
  , All
  , Trivial
+ , trivialize
  , trivial
  , trivial1
  , trivial'
@@ -396,6 +397,13 @@ class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
 class Trivial (a :: k)
 instance Trivial (a :: k)
 
+-- | Given a 'Flay' for any constraint @c@ obtain a 'Flay' for a 'Trivial'
+-- constraint.
+trivialize :: forall c s t f g. Flay c s t f g -> Flay Trivial s t f g
+{-# INLINE trivialize #-}
+trivialize fl0 = \h s ->
+  fl0 (\(Dict :: Dict (c a)) (fa :: f a) -> h (Dict :: Dict (Trivial a)) fa) s
+
 -- | You can use 'trivial'' if you don't care about the @c@ argument to 'Flay'.
 -- This implies that you won't be able to observe the @a@ in @forall a. f a@,
 -- all you can do with such @a@ is pass it around.
@@ -405,13 +413,13 @@ instance Trivial (a :: k)
 --    = fl (\\('Dict' :: 'Dict' ('Trivial' a)) (fa :: f a) -> h fa)
 -- @
 trivial'
-  :: forall m s t f g
+  :: forall m c s t f g
   .  Applicative m
-  => Flay Trivial s t f g
+  => Flay c s t f g
   -> (forall a. Trivial a => f a -> m (g a))
   -> s
   -> m t  -- ^
-trivial' fl = \h -> \s -> fl (\Dict fa -> h fa) s
+trivial' fl = \h -> \s -> trivialize fl (\Dict fa -> h fa) s
 {-# INLINE trivial' #-}
 
 -- | Like 'trivial'', but works on a 'Flayable' instead of taking an explicit
@@ -421,11 +429,12 @@ trivial' fl = \h -> \s -> fl (\Dict fa -> h fa) s
 -- 'trivial' = 'trivial'' 'flay'
 -- @
 trivial
-  :: (Applicative m, Flayable Trivial s t f g)
+  :: forall m s t f g
+  .  (Applicative m, Flayable Trivial s t f g)
   => (forall a. Trivial a => f a -> m (g a))
   -> s
   -> m t  -- ^
-trivial = trivial' flay
+trivial = trivial' (flay :: Flay Trivial s t f g)
 {-# INLINE trivial #-}
 
 -- | Like 'trivial'', but works on a 'Flayable1' instead of taking an explicit
@@ -435,11 +444,12 @@ trivial = trivial' flay
 -- 'trivial' = 'trivial'' 'flay1'
 -- @
 trivial1
-  :: (Applicative m, Flayable1 Trivial r)
+  :: forall m f g r
+  .  (Applicative m, Flayable1 Trivial r)
   => (forall a. Trivial a => f a -> m (g a))
   -> (r f)
   -> m (r g)  -- ^
-trivial1 = trivial' flay1
+trivial1 = trivial' (flay1 :: Flay Trivial (r f) (r g) f g)
 {-# INLINE trivial1 #-}
 
 --------------------------------------------------------------------------------
