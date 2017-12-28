@@ -561,12 +561,6 @@ instance {-# OVERLAPPABLE #-} (G.Generic a, GTerminal (G.Rep a)) => Terminal a w
 instance Terminal (Const () a) where
   terminal = Const ()
   {-# INLINE terminal #-}
-instance Terminal (Maybe a) where
-  terminal = Nothing
-  {-# INLINE terminal #-}
-instance Terminal [a] where
-  terminal = []
-  {-# INLINE terminal #-}
 
 class GTerminal (f :: * -> *) where
   gterminal :: f p
