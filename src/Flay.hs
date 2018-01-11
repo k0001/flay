@@ -57,7 +57,7 @@ module Flay
  ) where
 
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State (StateT(StateT), evalStateT)
+import Control.Monad.Trans.State (StateT(StateT), runStateT)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
 import Data.Constraint (Constraint, Dict(Dict))
 import Data.Dynamic (Dynamic, toDyn, fromDynamic)
@@ -634,8 +634,10 @@ unsafeZip
   -> s2
   -> m (Maybe t3)  -- ^
 unsafeZip fl1 fl2 fl3 pair = \s1 s2 -> runMaybeT $ do
-   t2 <- evalStateT (fl2 f2 s2) (collect' fl1 f1 s1)
-   lift (fl3 f3 t2)
+   (t2, dyns) <- runStateT (fl2 f2 s2) (collect' fl1 f1 s1)
+   case dyns of
+     [] -> lift (fl3 f3 t2)
+     _  -> MaybeT (pure Nothing)
  where
    f1 :: Dict (Typeable a) -> f a -> [Dynamic]
    f1 = \Dict !fa -> [toDyn fa :: Dynamic]
