@@ -7,6 +7,8 @@
 
 * Generalized type of `trivial'`.
 
+* Remove `Record` and `GRecord`.
+
 
 # Version 0.2
 

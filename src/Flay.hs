@@ -49,8 +49,6 @@ module Flay
  , zip
  , zip1
  , unsafeZip
- , Record
- , GRecord
  , terminal
  , Terminal
  , GTerminal(gterminal)
@@ -535,19 +533,6 @@ collect1 = collect' flay1
 
 --------------------------------------------------------------------------------
 
--- | Handwavy class of which only product or record types are supposed to be
--- instances.
-class Record a
-instance {-# OVERLAPPABLE #-} (G.Generic a, GRecord (G.Rep a)) => Record a
-
-class GRecord (a :: * -> *) where
-instance GRecord G.U1
-instance GRecord (G.K1 r x)
-instance GRecord x => GRecord (G.M1 i j x)
-instance (GRecord l, GRecord r) => GRecord (l G.:*: r)
-
---------------------------------------------------------------------------------
-
 -- | Witness that @a@ is a terminal object. That is, that @a@ can always be
 -- constructed out of thin air.
 class Terminal a where
@@ -603,7 +588,7 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 --
 -- Note: 'zip1' is safer but less general than 'unsafeZip'.
 zip1
-  :: (Monad m, Record (s f), Typeable f, Flayable1 c s, Flayable1 Typeable s)
+  :: (Monad m, Typeable f, Flayable1 c s, Flayable1 Typeable s)
   => (forall x. Dict (c x) -> f x -> g x -> m (h x))
   -> s f
   -> s g
@@ -619,7 +604,7 @@ zip1 h = unsafeZip flay1 flay1 flay1 h
 --
 -- Note: 'zip' is safer but less general than 'unsafeZip'.
 zip
-  :: ( Monad m, Record s1, Typeable f
+  :: ( Monad m, Typeable f
      , Flayable Typeable s1 t1 f (Const ())
      , Flayable Typeable s2 t2 g (Product f g)
      , Flayable c t2 t3 (Product f g) h )
@@ -640,7 +625,7 @@ zip h = unsafeZip flay flay flay h
 -- two, but that pollutes the constraints a bit.
 unsafeZip
   :: forall c s1 s2 t1 t2 t3 f g h m
-  .  (Monad m, Record s1, Typeable f)
+  .  (Monad m, Typeable f)
   => (Flay Typeable s1 t1 f (Const ()))
   -> (Flay Typeable s2 t2 g (Product f g))
   -> (Flay c t2 t3 (Product f g) h)
