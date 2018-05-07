@@ -1,2 +1,1 @@
-{ compiler ? "ghc822" }:
-(import ./release.nix {}).${compiler}.flay
+(import ./release.nix {}).flay
