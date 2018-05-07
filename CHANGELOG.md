@@ -1,13 +1,13 @@
 # Version 0.3
 
-* `zip`, `zip1` and `unsafeZip` now take a monadic pairing function, and return
+* BREAKING CHANGE: `zip`, `zip1` and `unsafeZip` now take a monadic pairing function, and return
   `Maybe` where `Nothing` happens in the target indexes do not match.
+
+* BREAKING CHANGE: Remove `Record` and `GRecord`.
 
 * Added `trivialize`.
 
 * Generalized type of `trivial'`.
-
-* Remove `Record` and `GRecord`.
 
 
 # Version 0.2
