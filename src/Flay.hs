@@ -15,10 +15,10 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 
 -- | The most commonly used names in this module are intended to be imported
--- unqualified:
+-- unqualified, as necessary:
 --
 -- @
--- import Flay (Flay, Flayable(flay), gflay, Dict(Dict))
+-- import Flay (Flay, Flayable(flay), Flayable1(flay1))
 -- @
 --
 -- The rest of the names, qualified:
