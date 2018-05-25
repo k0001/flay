@@ -1,3 +1,10 @@
+# Version 0.3.1
+
+* Added `pump`, `dump`, `Pump` and `GPump`.
+
+* Added `GFlay'` and `GTerminal` instances for `GHC.Generics.U1`.
+
+
 # Version 0.3
 
 * BREAKING CHANGE: `zip`, `zip1` and `unsafeZip` now take a monadic pairing function, and return

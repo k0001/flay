@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -52,6 +53,11 @@ module Flay
  , terminal
  , Terminal
  , GTerminal(gterminal)
+ -- * Pump & Dump
+ , Pump
+ , GPump
+ , pump
+ , dump
  -- ** Re-exports
  , Dict(Dict)
  ) where
@@ -458,7 +464,6 @@ class (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
 instance (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
   => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 
-
 gflay :: GFlay c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 gflay = \h s -> G.to <$> gflay' h (G.from s)
 {-# INLINE gflay #-}
@@ -467,6 +472,10 @@ class GFlay' (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) where
   gflay' :: Flay c (s p) (t p) f g
 
 instance GFlay' c G.V1 G.V1 f g where
+  gflay' _ _ = undefined -- unreachable
+  {-# INLINE gflay' #-}
+
+instance GFlay' c G.U1 G.U1 f g where
   gflay' _ _ = undefined -- unreachable
   {-# INLINE gflay' #-}
 
@@ -537,24 +546,35 @@ collect1 = collect' flay1
 -- constructed out of thin air.
 class Terminal a where
   terminal :: a
+
 instance Terminal () where
   terminal = ()
   {-# INLINE terminal #-}
+
 instance {-# OVERLAPPABLE #-} (G.Generic a, GTerminal (G.Rep a)) => Terminal a where
   terminal = G.to gterminal
   {-# INLINE terminal #-}
+
 instance Terminal (Const () a) where
   terminal = Const ()
   {-# INLINE terminal #-}
 
+---
 class GTerminal (f :: * -> *) where
   gterminal :: f p
+
+instance GTerminal G.U1 where
+  gterminal = G.U1
+  {-# INLINE gterminal #-}
+
 instance Terminal x => GTerminal (G.K1 i x) where
   gterminal = G.K1 terminal
   {-# INLINE gterminal #-}
+
 instance GTerminal f => GTerminal (G.M1 i c f) where
   gterminal = G.M1 gterminal
   {-# INLINE gterminal #-}
+
 instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
   gterminal = gterminal G.:*: gterminal
   {-# INLINE gterminal #-}
@@ -648,6 +668,180 @@ unsafeZip fl1 fl2 fl3 pair = \s1 s2 -> runMaybeT $ do
    f3 :: Dict (c a) -> Product f g a -> m (h a)
    f3 = \Dict (Pair fa ga) -> pair Dict fa ga
 
+
+--------------------------------------------------------------------------------
+
+-- | Wrapper allowing a 'G.Generic' non 'Flayable' type to become 'Flayable'.
+--
+-- Most datatypes that can have useful 'Flayable' instances are often
+-- parametrized by a type constructor @f :: k -> *@, and have all or some of
+-- their fields wrapped in said @f@, like so:
+--
+-- @
+-- data Foo f = Foo (f 'Int') (f 'Bool')
+-- @
+--
+-- However, that kind of representation is not that common, and it can sometimes
+-- be unconfortable to use, particularly if @f ~ 'Identity'@ due to the
+-- necessary wrapping and unwrapping of values. In Haskell, it's more common to
+-- use a representation like the following for records (or sums):
+--
+-- @
+-- data Bar = Bar 'Int' 'Bool'
+--   deriving ('G.Generic')
+-- @
+--
+-- The problem with that representation, however, is that it prevents us to
+-- operate on the individual fields as enabled by 'Flay'.
+--
+-- 'Pump' is a wrapper that converts types like 'Bar' into types like 'Foo'. In
+-- our concrete case, @'Pump' 'Bar' f@ is isomorphic to @'Foo' f@. But more
+-- importantly, @'Pump' 'Bar' f@ automatically gets a 'Flayable' instance of its
+-- own, allowing you to use 'flay' to operate on @'Pump' 'Bar' f@ as you would
+-- operate on @'Foo' f@.
+--
+-- To construct a 'Pump' you use 'pump', and to remove the 'Pump' wrapper you
+-- use 'dump', which satisfy the following identity law:
+--
+-- @
+-- 'dump' 'id' . 'pump' 'pure'  ==  'pure'
+-- @
+--
+-- 'Pump' relies on Haskell's 'G.Generic's, which is why we derived
+-- 'G.Generic' for our @Bar@ above. If @Bar@ didn't have a 'G.Generic' instance,
+-- then you wouldn't be able to use 'Pump' and would be better served by a
+-- manually written functions converting @Bar@ to @Foo@ and back.
+--
+-- Keep in mind that @'Pump' s f@ will only add @f@ wrappers to the immediate
+-- children fields of @s@ (which could itself be a sum type or a product type),
+-- but it won't recurse into the fields and add @f@ wrappers to them.
+--
+-- Very contrived and verbose example using all of 'pump', 'dump' and 'flay':
+--
+-- @
+-- -- | Replaces all of the fields of the given Bar with values 'Read' from
+-- -- 'System.IO.stdin', if possible.
+-- qux :: Bar -> 'IO' ('Either' 'String' 'Bar')
+-- qux bar0 = do
+--    let pbar0 :: 'Pump' Bar 'Identity'
+--        pbar0 = 'pump' 'Identity' bar0
+--    let h :: 'Dict' ('Read' a) -> 'Identity' a -> 'IO' ('Maybe' a)
+--        h 'Dict' ('Identity' _) = 'fmap' 'Text.readMaybe' 'getLine'
+--    pbar1 :: 'Pump' Bar 'Maybe' <- 'flay' h pbar0
+--    -- We convert the 'Maybe's to 'Either' just for demonstration purposes.
+--    -- Using 'dump' 'id' would have been enough to make this function
+--    -- return a 'Maybe' Bar.
+--    let ebar1 :: 'Either' 'String' 'Bar'
+--        ebar1 = 'dump' ('maybe' ('Left' \"Bad") 'Right') pbar1
+--    pure ebar1
+-- @
+--
+-- Or, written in a less verbose manner:
+--
+-- @
+-- qux :: Bar -> 'IO' ('Either' 'String' 'Bar')
+-- qux bar = 'fmap' ('dump' ('maybe' ('Left' \"Bad") 'Right'))
+--                ('flay' \@'Read'
+--                      (\('Dict' ('Identity' _) -> 'fmap' 'Text.readMaybe' 'getLine')
+--                      ('pump' 'Identity' bar)
+-- @
+--
+-- We can use @qux@ in GHCi as follows:
+--
+-- @
+-- > qux (Bar 0 False)
+-- /not a number/
+-- /not a bool/
+-- __Left \"Bad"__
+--
+-- > qux (Bar 0 False)
+-- /1/
+-- /True/
+-- __Right (Bar 1 True)__
+-- @
+data Pump s f = forall p. Pump !(GPumped (G.Rep s) f p)
+
+instance
+  (GFlay' c (GPumped (G.Rep s) f) (GPumped (G.Rep s) g) f g)
+  => Flayable c (Pump s f) (Pump s g) f g where
+  flay h (Pump rep) = Pump <$> gflay' h rep
+  {-# INLINE flay #-}
+
+-- | Wrap @s@ in 'Pump' so that it can be 'flay'ed.
+--
+-- See the documentation for 'Pump' for more details.
+pump
+  :: GPump s f
+  => (forall x. x -> f x)
+  -- ^ How to wrap in @f@ each individual child field of @s@.
+  -> s
+  -> Pump s f  -- ^
+pump f = \s -> Pump (gpump f (G.from s))
+{-# INLINE pump #-}
+
+-- | Remove the 'Pump' wraper around @s@.
+--
+-- See the documentation for 'Pump' for more details.
+dump
+  :: (GPump s f, Applicative m)
+  => (forall a. f a -> m a)
+  -- ^ How to remove the @f@ wrapper from every child field of @'Pump' s f@.
+  -> Pump s f
+  -> m s  -- ^
+dump f = \(Pump rep) -> G.to <$> gdump f rep
+{-# INLINE dump #-}
+
+-- | This class is used to support 'pump' and 'dump' internally. We only
+-- export its name so that you can use it in constraints if necessary.
+class (G.Generic s, GPump' (G.Rep s) f) => GPump s f
+instance (G.Generic s, GPump' (G.Rep s) f) => GPump s f
+
+class GPump' (s :: k -> *) (f :: * -> *) where
+  type GPumped s f :: k -> *
+  gpump :: (forall a. a -> f a) -> s p -> GPumped s f p
+  gdump :: Applicative m => (forall a. f a -> m a) -> GPumped s f p -> m (s p)
+
+instance GPump' G.V1 f where
+  type GPumped G.V1 f = G.V1
+  gpump _ _ = undefined -- unreachable
+  gdump _ _ = undefined -- unreachable
+
+instance GPump' G.U1 f where
+  type GPumped G.U1 f = G.U1
+  gpump _ G.U1 = G.U1
+  {-# INLINE gpump #-}
+  gdump _ G.U1 = pure G.U1
+  {-# INLINE gdump #-}
+
+instance GPump' (G.K1 i c) f where
+  type GPumped (G.K1 i c) f = G.K1 i (f c)
+  gpump f (G.K1 c) = G.K1 (f c)
+  {-# INLINE gpump #-}
+  gdump f (G.K1 c) = G.K1 <$> f c
+  {-# INLINE gdump #-}
+
+instance GPump' s f => GPump' (G.M1 i j s) f where
+  type GPumped (G.M1 i j s) f = G.M1 i j (GPumped s f)
+  gpump f (G.M1 sp) = G.M1 (gpump f sp)
+  {-# INLINE gpump #-}
+  gdump f (G.M1 sp) = G.M1 <$> gdump f sp
+  {-# INLINE gdump #-}
+
+instance (GPump' sl f, GPump' sr f) => GPump' (sl G.:*: sr) f where
+  type GPumped (sl G.:*: sr) f = GPumped sl f G.:*: GPumped sr f
+  gpump f (slp G.:*: srp) = gpump f slp G.:*: gpump f srp
+  {-# INLINE gpump #-}
+  gdump f (slp G.:*: srp) = (G.:*:) <$> gdump f slp <*> gdump f srp
+  {-# INLINE gdump #-}
+
+instance (GPump' sl f, GPump' sr f) => GPump' (sl G.:+: sr) f where
+  type GPumped (sl G.:+: sr) f = GPumped sl f G.:+: GPumped sr f
+  gpump f (G.L1 slp) = G.L1 (gpump f slp)
+  gpump f (G.R1 srp) = G.R1 (gpump f srp)
+  {-# INLINE gpump #-}
+  gdump f (G.L1 slp) = G.L1 <$> gdump f slp
+  gdump f (G.R1 srp) = G.R1 <$> gdump f srp
+  {-# INLINE gdump #-}
 
 --------------------------------------------------------------------------------
 
