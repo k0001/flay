@@ -461,27 +461,25 @@ _test_flay1_TypeApplications = flay1 @Trivial
 -- This is an @OVERLAPPABLE@ instance, meaning that you can provide a different
 -- instance for your 'G.Generic' datatype, if necessary.
 instance {-# OVERLAPPABLE #-} GFlay1 c r => Flayable1 c r where
-  -- OH MY EYES! I think we can implement this nicely using Generic1, by having
-  -- some GFlay1' class similar to GFlay' but relying on Generic1. However, I
-  -- tried to do that and failed. Please send help!
+  flay1 = gflay1
   {-# INLINE flay1 #-}
-  flay1 = unsafePoly1 gflay
 
 -- | INTERNAL. The 'GFlay' superclass here is the actual constraint to the
 -- @'Flayable1' c r@ instance. We do not export it just in case, so that nobody
 -- tries to create an overlapping instance that breaks something related to the
 -- way we are using 'unsafeCoerce' in 'unsafePoly1'.
-class GFlay c (r F) (r G) F G => GFlay1 c r
-instance GFlay c (r F) (r G) F G => GFlay1 c r
+class GFlay c (r F) (r G) F G => GFlay1 c r where
+  gflay1 :: Flay c (r f) (r g) f g
 
-unsafePoly1
-  :: Flay c (r F) (r G) F G
-  -> Flay c (r f) (r g) f g
-{-# INLINE unsafePoly1 #-}
-unsafePoly1 flFG = \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
-   unsafeCoerce (flFG (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
-                      (unsafeCoerce rf :: r F)
-                   :: m (r G))
+instance GFlay c (r F) (r G) F G => GFlay1 c r where
+  -- OH MY EYES! I think we can implement this nicely using Generic1, by having
+  -- some GFlay1' class similar to GFlay' but relying on Generic1. However, I
+  -- tried to do that and failed. Please send help!
+  {-# INLINE gflay1 #-}
+  gflay1 = \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
+    unsafeCoerce (gflay (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
+                        (unsafeCoerce rf :: r F)
+                    :: m (r G))
 
 --------------------------------------------------------------------------------
 
@@ -1058,9 +1056,9 @@ type family GFields1 (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Cons
   GFields1 c (sl G.:+: sr) f = (GFields1 c sl f, GFields1 c sr f)
 
 
--- | Used internally as a placeholder of kind @forall k. k -> *@.
+-- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
 data F (a :: k)
 
--- | Used internally as a placeholder of kind @forall k. k -> *@.
+-- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
 data G (a :: k)
 
