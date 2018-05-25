@@ -411,8 +411,8 @@ instance {-# OVERLAPPABLE #-}
 --
 -- Unfortunately, we can't readily existentialize the arguments to 'Flayable',
 -- which is why you'll need to specify both 'Flayable1' and 'Flayable'
--- instances. Notice, however, that 'flay1' can be defined in terms of
--- 'flay' and vice-versa, so this should be very mechanical.
+-- instances. Notice, however, that 'flay' can be defined in terms of
+-- 'flay1', so this should be very mechanical.
 class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
   -- | If @r f@ and @r g@ are instances of 'G.Generic', then 'flay1' gets a
   -- default implementation. For example, provided the @Foo@ datatype shown in
@@ -422,8 +422,6 @@ class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
   -- @
   -- instance (c 'Int', c 'Bool') => 'Flayable1' c Foo
   -- @
-  --
-  -- Notice that 'flay1' can be defined in terms of 'flay' as well.
   flay1 :: Flay c (r f) (r g) f g
   default flay1 :: GFlay c (r f) (r g) f g => Flay c (r f) (r g) f g
   flay1 = gflay
@@ -514,7 +512,7 @@ instance GFlay' c G.V1 G.V1 f g where
   {-# INLINE gflay' #-}
 
 instance GFlay' c G.U1 G.U1 f g where
-  gflay' _ _ = undefined -- unreachable
+  gflay' _ _ = pure G.U1
   {-# INLINE gflay' #-}
 
 instance c a => GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
