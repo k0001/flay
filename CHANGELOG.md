@@ -1,5 +1,8 @@
 # Version 0.3.1
 
+* BREAKING CHANGE: Fixed `TypeApplications` for `flay1` so that @c@ comes
+  first.
+
 * Added `pump`, `dump`, `Pump` and `GPump`.
 
 * Added `GFlay'` and `GTerminal` instances for `GHC.Generics.U1`.

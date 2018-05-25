@@ -10,6 +10,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -389,6 +390,12 @@ class Flayable (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
   flay = gflay
   {-# INLINE flay #-}
 
+-- | Just making sure this compiles.
+_test_flay_TypeApplications
+  :: Flayable Trivial s t f g
+  => Flay Trivial s t (f :: k -> *) (g :: k -> *)
+_test_flay_TypeApplications = flay @Trivial
+
 -- | All datatypes parametrized over some type constructor @f :: k -> *@ that
 -- have a 'G.Generic' instance get a 'Flayable' instance for free. For example:
 --
@@ -413,7 +420,14 @@ instance {-# OVERLAPPABLE #-}
 -- which is why you'll need to specify both 'Flayable1' and 'Flayable'
 -- instances. Notice, however, that 'flay' can be defined in terms of
 -- 'flay1', so this should be very mechanical.
-class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
+--
+-- @
+-- 'Flayable1' :: (k -> 'Constraint') -> ((k -> *) -> *) -> 'Constraint'
+-- @
+
+-- Note: We can't explicitly kind c and r because it breaks TypeApplications for
+-- 'flay1'.
+class Flayable1 c r where
   -- | If @r f@ and @r g@ are instances of 'G.Generic', then 'flay1' gets a
   -- default implementation. For example, provided the @Foo@ datatype shown in
   -- the documentation for 'Flay' had a 'G.Generic' instance, then the following
@@ -426,6 +440,12 @@ class Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) where
   default flay1 :: GFlay c (r f) (r g) f g => Flay c (r f) (r g) f g
   flay1 = gflay
   {-# INLINE flay1 #-}
+
+-- | Just making sure this compiles.
+_test_flay1_TypeApplications
+  :: Flayable1 Trivial r
+  => Flay Trivial (r f) (r g) (f :: k -> *) (g :: k -> *)
+_test_flay1_TypeApplications = flay1 @Trivial
 
 --------------------------------------------------------------------------------
 
@@ -495,9 +515,9 @@ trivial1 = trivial' (flay1 :: Flay Trivial (r f) (r g) f g)
 --------------------------------------------------------------------------------
 
 -- | Convenience 'Constraint' for satisfying basic 'GFlay'' needs for @s@ and @t@.
-class (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
+class (GFlay' c (G.Rep s) (G.Rep t) f g, G.Generic s, G.Generic t)
   => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
-instance (G.Generic s, G.Generic t, GFlay' c (G.Rep s) (G.Rep t) f g)
+instance (GFlay' c (G.Rep s) (G.Rep t) f g, G.Generic s, G.Generic t)
   => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 
 gflay :: GFlay c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
