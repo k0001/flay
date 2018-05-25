@@ -29,7 +29,6 @@
 -- @
 module Flay
  ( Flay
- , inner
  -- * Flayable
  , Flayable(flay)
  , Flayable1(flay1)
@@ -58,7 +57,12 @@ module Flay
  , GPump
  , pump
  , dump
- -- ** Re-exports
+ -- * Miscellaneous
+ , Fields
+ , GFields
+ , Fields1
+ , GFields1
+ -- * Re-exports
  , Dict(Dict)
  ) where
 
@@ -69,7 +73,6 @@ import Data.Constraint (Constraint, Dict(Dict))
 import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 import Data.Functor.Product (Product(Pair))
 import Data.Functor.Const (Const(Const, getConst))
-import Data.Functor.Identity (Identity(runIdentity))
 import Data.Typeable (Typeable)
 import qualified GHC.Generics as G
 import Prelude hiding (zip)
@@ -81,7 +84,12 @@ import Prelude hiding (zip)
 -- @(forall a. c a => f a -> m (g a))@ to targeted occurences of @f a@ inside
 -- @s@.
 --
--- A 'Flay' must obey the 'inner' identity law.
+-- A 'Flay' must obey the following identity law:
+--
+-- @
+-- forall (fl :: 'Flay' c s t f g).
+--    fl ('const' 'pure')  ==  'pure'
+-- @
 --
 -- When defining 'Flay' values, you should leave @c@, @f@, and @g@ fully
 -- polymorphic, as these are the most useful types of 'Flay's.
@@ -333,38 +341,67 @@ type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
   = forall m. Applicative m
        => (forall (a :: k). Dict (c a) -> f a -> m (g a)) -> s -> m t
 
--- | Inner identity law:
---
--- @
--- (\\fl -> 'runIdentity' . 'trivial'' fl 'pure') = 'id'
--- @
-inner :: Flay Trivial s s f f -> s -> s
-inner fl = runIdentity . trivial' fl pure
-
 --------------------------------------------------------------------------------
 
 -- | Default 'Flay' implementation for @s@ and @t@.
 --
 -- When defining 'Flayable' instances, you should leave @c@, @f@, and @g@
 -- fully polymomrphic, as these are the most useful types of 'Flayables's.
-class Flayable (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) | s -> f, t -> g, s g -> t, t f -> s where
-  -- | If @s@ and @t@ are instances of 'G.Generic', then 'gflay' can be used as
-  -- default implementation for 'flay'. For example, provided the @Foo@ datatype
-  -- shown in the documentation for 'Flay' had a 'G.Generic' instance, then the
-  -- following 'Flayable' instance would get a default implementation for
-  -- 'flay':
-  --
-  -- @
-  -- instance (c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g where
-  --   'flay' = 'gflay'
-  -- @
-  --
-  -- Notice that 'flay' can be defined in terms of 'flay1' as well.
-  --
-  -- /Implementors note:/ Unfortunately, due to some strange bug in GHC, we
-  -- can't use @DefaultSignatures@ to say @'flay' = 'gflay'@, because when doing
-  -- that the kind of @c@ infers incorrectly.
+--
+-- If @s@ and @t@ are instances of 'G.Generic', then 'gflay' can be used as
+-- default implementation for 'flay'. For example, provided the following
+-- datatype and its 'G.Generic' instance:
+--
+-- @
+-- data Foo f = Foo (f 'Int') (f 'Bool')
+--   deriving ('G.Generic')
+-- @
+-- Then the following 'Flayable' instance would get a default implementation for
+-- 'flay':
+--
+-- @
+-- instance (c 'Int', c 'Bool') => 'Flayable' c (Foo f) (Foo g) f g
+-- @
+--
+-- But actually, this library exports an @OVERLAPPABLE@ instance that covers
+-- datatypes like 'Foo' above, so
+-- /most times you don't even need to write the 'Flayable' instance yourself/.
+-- That is, a @'Flayable' c (r f) (r g) f g@ for @r@ types parametrized by a
+-- type-constructor, such as 'Foo', having 'G.Generic' instances.
+--
+-- In cases where you do need to define the 'Flayable' instance yourself, you'll
+-- notice that constraints applying @c@ to every immediate child field type will
+-- bubble up, such as @(c 'Int', c 'Bool')@ in the example above. This module
+-- exports the 'Fields1' constraint that can be used to reduce that boilerplate
+-- for datatypes that implement 'G.Generic', tackling all of the fields at once.
+-- That is, the 'Flayable' instance for 'Foo' above could have been written like
+-- this:
+--
+-- @
+-- instance 'Fields1' c Foo => 'Flayable' c (Foo f) (Foo g) f g
+-- @
+--
+-- Notice that 'flay' can be defined in terms of 'flay1' as well.
+class Flayable (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+  | s -> f, t -> g, s g -> t, t f -> s where
   flay :: Flay c s t f g
+  default flay :: GFlay c s t f g => Flay c s t f g
+  flay = gflay
+  {-# INLINE flay #-}
+
+-- | All datatypes parametrized over some type constructor @f :: k -> *@ that
+-- have a 'G.Generic' instance get a 'Flayable' instance for free. For example:
+--
+-- @
+-- data Foo f = Foo (f 'Int') (f 'Bool')
+--   deriving ('G.Generic')
+-- @
+--
+-- This is an @OVERLAPPABLE@ instance, meaning that you can provide a different
+-- instance for your 'G.Generic' datatype, if necessary.
+instance {-# OVERLAPPABLE #-}
+  GFlay c (r f) (r g) f g
+  => Flayable c (r f) (r g) f g
 
 --------------------------------------------------------------------------------
 
@@ -413,8 +450,9 @@ trivialize fl0 = \h s ->
 -- all you can do with such @a@ is pass it around.
 --
 -- @
--- 'trivial'' fl h
---    = fl (\\('Dict' :: 'Dict' ('Trivial' a)) (fa :: f a) -> h fa)
+-- forall (fl :: 'Flay' 'Trivial' s t f g)
+--        (h :: 'Applicative' m => 'Dict' 'Trivial' -> f a -> m (g a)).
+-- 'trivial'' fl h  == fl ('const' h)
 -- @
 trivial'
   :: forall m c s t f g
@@ -852,7 +890,119 @@ instance (GPump' sl f, GPump' sr f) => GPump' (sl G.:+: sr) f where
 -- Thus, we only export @All@
 class All' cs x => All (cs :: [k -> Constraint]) (x :: k)
 instance All' cs x => All cs x
+
+-- | Type-family version of 'All'.
 type family All' (cs :: [k -> Constraint]) (x :: k) :: Constraint where
   All' (c ': cs) x = (c x, All' cs x)
   All' '[] _ = ()
+
+-- | Ensure that all of the immeditate children fields of @s@ satisfy @c@.
+--
+-- For example, in a datatype like the following:
+--
+-- @
+-- data Bar = Bar 'Int' 'Bool'
+-- @
+--
+-- The 'Fields' constraint behaves like this:
+--
+-- @
+-- 'Fields' c Bar  ==  (c 'Int', c 'Bool')
+-- @
+--
+-- 'Fields' can be used to remove boilerplate from contexts, since @c@
+-- will need to be mentioned just once, rather than once per type of field. This
+-- is particularly useful in the case of datatypes as 'Foo' below, intended to
+-- be used with 'Flay':
+--
+-- @
+-- data Foo f = Foo (f 'Int') (f 'Bool')
+-- @
+--
+-- The problem with types shaped like 'Foo' is that deriving some useful
+-- instances for them, like 'Show', involves a lot of boilerplate.
+-- For one, the usual @deriving ('Show')@ statement doesn't work, and you
+-- need to rely on the @StandaloneDeriving@ GHC extension. But even that's not
+-- enough, since you need to ensure that 'Show' constrains the individual field
+-- types as well. That is:
+--
+-- @
+-- deriving instance ('Show' (f 'Int'), 'Show' (f 'Bool')) => 'Show' (Foo f)
+-- @
+--
+-- This works, but hopefully you can see how this can become very verbose when
+-- you have more than a two or three datatypes in your fields. Instead, provided
+-- we derive 'G.Generic' for 'Foo', we can use 'Fields' to remove that
+-- boilerplate. That is:
+--
+-- @
+-- data Foo f = Foo (f 'Int') (f 'Bool')
+--   deriving ('G.Generic')
+--
+-- deriving instance 'Fields' 'Show' (Foo f) => 'Show' (Foo f)
+-- @
+type Fields c s = GFields c (G.Rep s)
+
+-- | Like 'Fields', but @s@ is expected to be a 'G.Rep'.
+--
+-- This 'Constraint' ensures that @c@ is satsfieds by all of the 'G.K1' types
+-- appearing in @s@, which is expected to be one of the various 'G.Generic'
+-- representation types.
+type family GFields (c :: kc -> Constraint) (s :: ks -> *) :: Constraint where
+  GFields _ G.V1 = ()
+  GFields _ G.U1 = ()
+  GFields c (G.K1 _ a) = (c a)
+  GFields c (G.M1 _ _ s) = GFields c s
+  GFields c (sl G.:*: sr) = (GFields c sl, GFields c sr)
+  GFields c (sl G.:+: sr) = (GFields c sl, GFields c sr)
+
+--------------------------------------------------------------------------------
+
+-- | This is like 'Fields', but it targets only field types that are wrapped by
+-- some type-constructor @f@.
+--
+-- That is, for all @a@ in @s f@ such that @f a@ is an immediate children of @s
+-- f@, then @c a@ must be satisfied.
+--
+-- 'Fields1' can be used to remove boilerplate from contexts, since @c@
+-- will need to be mentioned just once, rather than once per type of field. This
+-- is particularly useful in the case of datatypes as 'Foo' below, intended to
+-- be used with 'Flay':
+--
+-- @
+-- data Foo f = Foo (f 'Int') (f 'Bool')
+-- @
+--
+-- If, for example, you intend to implement a @'Flayable' c (Foo f) (Foo g) f g@
+-- instance, then constraints @c 'Int'@ and @c 'Bool'@ will propagate. However,
+-- instead of writing @(c 'Int', c 'Bool')@, you can write @'Fields1' c 'Foo'@
+-- and achieve the same, which will reduce boilerplate significantly in cases
+-- where the number of types contained in @f@ is larger. That is:
+--
+-- @
+-- forall (c :: * -> 'Constraint').
+--    'Fields1' c 'Foo'  ==  (c 'Int', c 'Bool')
+-- @
+--
+-- Notice that 'Fields1' only works with types of kind @(k -> *) -> *@ such as
+-- 'Foo'. That is, types that are parametrized by a type constructor.
+type Fields1 c r = GFields1 c (G.Rep (r F)) F
+
+-- | Used internally by 'Fields1' as a placeholder of kind @forall k. k -> *@.
+data F (a :: k)
+
+-- | Like 'Fields1', but @s@ is expected to be a 'G.Rep', and the type-constructor
+-- @f@ expected to wrap all of the field targets we want to constraint with @c@
+-- should be given explicitly.
+--
+-- This 'Constraint' ensures that @c@ is satsfieds by all of the 'G.K1' types
+-- appearing in @s@ that are wrapped by @f@.
+type family GFields1 (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Constraint where
+  GFields1 _ G.V1 _ = ()
+  GFields1 _ G.U1 _ = ()
+  GFields1 c (G.K1 _ (f a)) f = (c a)
+  GFields1 c (G.K1 _ _) f = ()
+  GFields1 c (G.M1 _ _ s) f = GFields1 c s f
+  GFields1 c (sl G.:*: sr) f = (GFields1 c sl f, GFields1 c sr f)
+  GFields1 c (sl G.:+: sr) f = (GFields1 c sl f, GFields1 c sr f)
 

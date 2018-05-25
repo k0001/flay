@@ -4,6 +4,8 @@
 
 * Added `GFlay'` and `GTerminal` instances for `GHC.Generics.U1`.
 
+* Added `Fields`, `GFields`, `Fields1` and `GFields1`.
+
 
 # Version 0.3
 
