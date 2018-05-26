@@ -423,23 +423,36 @@ instance {-# OVERLAPPABLE #-}
 -- | 'Flayable1' is 'Flayable' specialized for the common case of @s ~ r f@ and
 -- @t ~ r g@. The rationale for introducing this seemingly redundant constraint
 -- is that 'Flayable1' is less verbose than 'Flayable'.
-
--- Implementors note:
 --
--- If we had @QuantifiedConstraints@, then 'Flayable1' would be something like:
+-- In other words, if we had @QuantifiedConstraints@, then 'Flayable1' would be
+-- something like:
 --
 -- @
 -- 'Flayable1' c r
 --    ==  forall (f :: k -> *) (g :: k -> *).
---          'Flayable' c (r f) (r g) f g
+--           'Flayable' c (r f) (r g) f g
 -- @
---
--- Currently, however, 'Flayable1' is using some of the skolem trickery
--- described in detail in "Data.Constraint.Forall". However, the approach taken
--- suffers from the soundness issues described there. We need to use something
--- like the 'Skolem' type family, rather than un-exported 'F' and 'G'.
-type Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *)
-  = Flayable c (r F) (r G) F G
+
+-- Implementors note: Currently, 'Flayable1' is uses some of the skolem trickery
+-- described in detail in "Data.Constraint.Forall", specialized to 'Flayable'.
+type family Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) :: Constraint where
+  Flayable1 c r = Flayable1_ c r
+
+-- | This inner 'Flayable1_' class prevents the skolem from leaking to the user.
+class Flayable1K c r (Skolem (Flayable1K c r))
+  => Flayable1_ (c :: k -> Constraint) (r :: (k -> *) -> *)
+instance Flayable1K c r (Skolem (Flayable1K c r))
+  => Flayable1_ c r
+
+-- | Like @Flayable c (r F) (r G) F G@, but with a superfluous trailing @x@
+-- to match the kind expected by 'Skolem'.
+class Flayable c (r F) (r G) F G
+  => Flayable1K (c :: k -> Constraint) (r :: (k -> *) -> *) (x :: *)
+instance Flayable c (r F) (r G) F G
+  => Flayable1K c r x
+
+-- The `Skolem` type family represents skolem variables; do not export!
+type family Skolem (p :: k -> Constraint) :: k where
 
 -- | Like 'flay', but specialized to work on 'Flayable1'.
 flay1 :: forall c r f g. Flayable1 c r => Flay c (r f) (r g) f g
@@ -1020,7 +1033,13 @@ type family GFields (c :: kc -> Constraint) (s :: ks -> *) :: Constraint where
 --
 -- Notice that 'FieldsF' only works with types of kind @(k -> *) -> *@ such as
 -- 'Foo'. That is, types that are parametrized by a type constructor.
-type FieldsF c r = GFieldsF c (G.Rep (r F)) F
+
+-- This type-family vs. class dance is so that 'F' doesn't show up in the public
+-- API (that is, in 'FieldsF').
+type family FieldsF (c :: k -> Constraint) (r :: (k -> *) -> *) :: Constraint where
+  FieldsF c r = FieldsF_ c r
+class GFieldsF c (G.Rep (r F)) F => FieldsF_ c r
+instance GFieldsF c (G.Rep (r F)) F => FieldsF_ c r
 
 -- | Like 'FieldsF', but @s@ is expected to be a 'G.Rep', and the type-constructor
 -- @f@ expected to wrap all of the field targets we want to constraint with @c@
@@ -1036,7 +1055,6 @@ type family GFieldsF (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Cons
   GFieldsF c (G.M1 _ _ s) f = GFieldsF c s f
   GFieldsF c (sl G.:*: sr) f = (GFieldsF c sl f, GFieldsF c sr f)
   GFieldsF c (sl G.:+: sr) f = (GFieldsF c sl f, GFieldsF c sr f)
-
 
 -- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
 data F (a :: k)

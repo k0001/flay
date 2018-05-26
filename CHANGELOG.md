@@ -11,10 +11,10 @@
 
 * COMPILER ASSISTED BREAKING CHANGE: `Flayable1` is not a typeclass anymore.
   Now it is a type synonym for `Flayable` using “quantified constraints” as
-  implemented in a spirit similar to `Data.Constraint.Forall`.
-  Accordingly, `flay1` is not a typeclass method anymore.
+  implemented in `Data.Constraint.Forall`. Accordingly, `flay1` is not a
+  typeclass method anymore.
 
-* `Generic` types parametrized by a type constructor who have all of their
+* `Generic` types parametrized by a type constructor who have *all* of their
   immediate children fields using said type constructor get a `Flayable`
   instance for free.
 
