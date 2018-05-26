@@ -1,0 +1,6 @@
+:set -XDeriveGeneric
+:set -XScopedTypeVariables
+:set -XStandaloneDeriving
+:set -XTypeApplications
+
+import GHC.Generics (Generic)
