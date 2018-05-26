@@ -27,6 +27,10 @@
 -- @
 -- import qualified Flay
 -- @
+--
+-- __IMPORTANT__: Always check the
+-- [changelog](https://hackage.haskell.org/package/flay/changelog) to learn
+-- more about changes between different versions.
 module Flay
  ( Flay
  -- * Flayable
