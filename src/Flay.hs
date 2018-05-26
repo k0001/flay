@@ -19,7 +19,7 @@
 -- unqualified, as necessary:
 --
 -- @
--- import Flay (Flay, Flayable(flay), Flayable1(flay1))
+-- import Flay (Flay, Flayable, flay, Flayable1, flay1)
 -- @
 --
 -- The rest of the names, qualified:
