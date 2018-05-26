@@ -11,13 +11,9 @@
 
 * Added `pump`, `dump`, `Pump` and `GPump`.
 
-* Added `GFlay1`, `gflay1`.
-
 * Added `GTerminal` instance for `GHC.Generics.U1`.
 
-* Added overlappable `GFlay'` instance for `GHC.Generics.K1` not wrapped by @f@.
-
-* Added `Fields`, `GFields`, `Fields1` and `GFields1`.
+* Added `Fields`, `GFields`, `FieldsF` and `GFieldsF`.
 
 
 # Version 0.3

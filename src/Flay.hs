@@ -61,8 +61,8 @@ module Flay
  -- * Miscellaneous
  , Fields
  , GFields
- , Fields1
- , GFields1
+ , FieldsF
+ , GFieldsF
  -- * Re-exports
  , Dict(Dict)
  ) where
@@ -383,13 +383,13 @@ type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 -- In cases where you do need to define the 'Flayable' instance yourself, you'll
 -- notice that constraints applying @c@ to every immediate child field type will
 -- bubble up, such as @(c 'Int', c 'Bool')@ in the example above. This module
--- exports the 'Fields1' constraint that can be used to reduce that boilerplate
+-- exports the 'FieldsF' constraint that can be used to reduce that boilerplate
 -- for datatypes that implement 'G.Generic', tackling all of the fields at once.
 -- That is, the 'Flayable' instance for 'Foo' above could have been written like
 -- this:
 --
 -- @
--- instance 'Fields1' c Foo => 'Flayable' c (Foo f) (Foo g) f g
+-- instance 'FieldsF' c Foo => 'Flayable' c (Foo f) (Foo g) f g
 -- @
 --
 -- Notice that 'flay' can be defined in terms of 'flay1' as well.
@@ -1030,7 +1030,7 @@ type family GFields (c :: kc -> Constraint) (s :: ks -> *) :: Constraint where
 -- That is, for all @a@ in @s f@ such that @f a@ is an immediate children of @s
 -- f@, then @c a@ must be satisfied.
 --
--- 'Fields1' can be used to remove boilerplate from contexts, since @c@
+-- 'FieldsF' can be used to remove boilerplate from contexts, since @c@
 -- will need to be mentioned just once, rather than once per type of field. This
 -- is particularly useful in the case of datatypes as 'Foo' below, intended to
 -- be used with 'Flay':
@@ -1041,33 +1041,33 @@ type family GFields (c :: kc -> Constraint) (s :: ks -> *) :: Constraint where
 --
 -- If, for example, you intend to implement a @'Flayable' c (Foo f) (Foo g) f g@
 -- instance, then constraints @c 'Int'@ and @c 'Bool'@ will propagate. However,
--- instead of writing @(c 'Int', c 'Bool')@, you can write @'Fields1' c 'Foo'@
+-- instead of writing @(c 'Int', c 'Bool')@, you can write @'FieldsF' c 'Foo'@
 -- and achieve the same, which will reduce boilerplate significantly in cases
 -- where the number of types contained in @f@ is larger. That is:
 --
 -- @
 -- forall (c :: * -> 'Constraint').
---    'Fields1' c 'Foo'  ==  (c 'Int', c 'Bool')
+--    'FieldsF' c 'Foo'  ==  (c 'Int', c 'Bool')
 -- @
 --
--- Notice that 'Fields1' only works with types of kind @(k -> *) -> *@ such as
+-- Notice that 'FieldsF' only works with types of kind @(k -> *) -> *@ such as
 -- 'Foo'. That is, types that are parametrized by a type constructor.
-type Fields1 c r = GFields1 c (G.Rep (r F)) F
+type FieldsF c r = GFieldsF c (G.Rep (r F)) F
 
--- | Like 'Fields1', but @s@ is expected to be a 'G.Rep', and the type-constructor
+-- | Like 'FieldsF', but @s@ is expected to be a 'G.Rep', and the type-constructor
 -- @f@ expected to wrap all of the field targets we want to constraint with @c@
 -- should be given explicitly.
 --
 -- This 'Constraint' ensures that @c@ is satsfieds by all of the 'G.K1' types
 -- appearing in @s@ that are wrapped by @f@.
-type family GFields1 (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Constraint where
-  GFields1 _ G.V1 _ = ()
-  GFields1 _ G.U1 _ = ()
-  GFields1 c (G.K1 _ (f a)) f = (c a)
-  GFields1 c (G.K1 _ _) f = ()
-  GFields1 c (G.M1 _ _ s) f = GFields1 c s f
-  GFields1 c (sl G.:*: sr) f = (GFields1 c sl f, GFields1 c sr f)
-  GFields1 c (sl G.:+: sr) f = (GFields1 c sl f, GFields1 c sr f)
+type family GFieldsF (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Constraint where
+  GFieldsF _ G.V1 _ = ()
+  GFieldsF _ G.U1 _ = ()
+  GFieldsF c (G.K1 _ (f a)) f = (c a)
+  GFieldsF c (G.K1 _ _) f = ()
+  GFieldsF c (G.M1 _ _ s) f = GFieldsF c s f
+  GFieldsF c (sl G.:*: sr) f = (GFieldsF c sl f, GFieldsF c sr f)
+  GFieldsF c (sl G.:+: sr) f = (GFieldsF c sl f, GFieldsF c sr f)
 
 
 -- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
