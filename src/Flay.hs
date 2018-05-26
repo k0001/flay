@@ -10,7 +10,6 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -36,7 +35,8 @@ module Flay
  -- ** Generics
  , gflay
  , GFlay
- , GFlay'(gflay')
+ , gflay1
+ , GFlay1
  -- ** Utils
  , All
  , Trivial
@@ -52,7 +52,7 @@ module Flay
  , unsafeZip
  , terminal
  , Terminal
- , GTerminal(gterminal)
+ , GTerminal
  -- * Pump & Dump
  , Pump
  , GPump
@@ -391,12 +391,6 @@ class Flayable (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
   flay = gflay
   {-# INLINE flay #-}
 
--- | Just making sure this compiles.
-_test_flay_TypeApplications
-  :: Flayable Trivial s t f g
-  => Flay Trivial s t (f :: k -> *) (g :: k -> *)
-_test_flay_TypeApplications = flay @Trivial
-
 -- | All datatypes parametrized over some type constructor @f :: k -> *@ that
 -- have a 'G.Generic' instance get a 'Flayable' instance for free. For example:
 --
@@ -444,11 +438,6 @@ class Flayable1 c r where
   flay1 = gflay
   {-# INLINE flay1 #-}
 
--- | Just making sure this compiles.
-_test_flay1_TypeApplications
-  :: Flayable1 Trivial r
-  => Flay Trivial (r f) (r g) (f :: k -> *) (g :: k -> *)
-_test_flay1_TypeApplications = flay1 @Trivial
 
 -- | All datatypes parametrized over some type constructor @f :: k -> *@ that
 -- have a 'G.Generic' instance get a 'Flayable1' instance for free. For example:
@@ -464,22 +453,23 @@ instance {-# OVERLAPPABLE #-} GFlay1 c r => Flayable1 c r where
   flay1 = gflay1
   {-# INLINE flay1 #-}
 
--- | INTERNAL. The 'GFlay' superclass here is the actual constraint to the
--- @'Flayable1' c r@ instance. We do not export it just in case, so that nobody
--- tries to create an overlapping instance that breaks something related to the
--- way we are using 'unsafeCoerce' in 'unsafePoly1'.
-class GFlay c (r F) (r G) F G => GFlay1 c r where
-  gflay1 :: Flay c (r f) (r g) f g
+-- | Convenient 'Constraint' for satisfying the requirements of 'gflay1'.
+type GFlay1 c r = GFlay c (r F) (r G) F G
 
-instance GFlay c (r F) (r G) F G => GFlay1 c r where
-  -- OH MY EYES! I think we can implement this nicely using Generic1, by having
-  -- some GFlay1' class similar to GFlay' but relying on Generic1. However, I
-  -- tried to do that and failed. Please send help!
-  {-# INLINE gflay1 #-}
-  gflay1 = \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
-    unsafeCoerce (gflay (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
-                        (unsafeCoerce rf :: r F)
-                    :: m (r G))
+-- OH MY EYES! I think we can implement this nicely using Generic1, by having
+-- some GFlay1' class similar to GFlay' but relying on Generic1. However, I
+-- tried to do that and failed. Please send help!
+--
+-- So, since by design neither @f@ nor @g@ show up in @'GFlay1' c r@, looking
+-- up the proper 'GFlay'' instance to dispatch to is not really possible. So,
+-- we pick @f@ and @g@ to be 'F' and 'G', and then coerce between them and @f@
+-- and @g@ respectively, which seems to work fine.
+gflay1 :: GFlay1 c r => Flay c (r f) (r g) f g
+{-# INLINE gflay1 #-}
+gflay1 = \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
+  unsafeCoerce (gflay (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
+                      (unsafeCoerce rf :: r F)
+                  :: m (r G))
 
 --------------------------------------------------------------------------------
 
@@ -548,11 +538,9 @@ trivial1 = trivial' (flay1 :: Flay Trivial (r f) (r g) f g)
 
 --------------------------------------------------------------------------------
 
--- | Convenience 'Constraint' for satisfying basic 'GFlay'' needs for @s@ and @t@.
-class (GFlay' c (G.Rep s) (G.Rep t) f g, G.Generic s, G.Generic t)
-  => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
-instance (GFlay' c (G.Rep s) (G.Rep t) f g, G.Generic s, G.Generic t)
-  => GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+-- | Convenient 'Constraint' for satisfying the requirements of 'gflay'.
+type GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+  = (GFlay' c (G.Rep s) (G.Rep t) f g, G.Generic s, G.Generic t)
 
 gflay :: GFlay c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 gflay = \h s -> G.to <$> gflay' h (G.from s)
@@ -571,6 +559,10 @@ instance GFlay' c G.U1 G.U1 f g where
 
 instance c a => GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
   gflay' h (G.K1 fa) = G.K1 <$> h Dict fa
+  {-# INLINE gflay' #-}
+
+instance {-# OVERLAPPABLE #-} GFlay' c (G.K1 r a) (G.K1 r a) f g where
+  gflay' _ (G.K1 a) = pure (G.K1 a)
   {-# INLINE gflay' #-}
 
 instance (GFlay' c s t f g)
@@ -881,10 +873,9 @@ dump
 dump f = \(Pump rep) -> G.to <$> gdump f rep
 {-# INLINE dump #-}
 
--- | This class is used to support 'pump' and 'dump' internally. We only
--- export its name so that you can use it in constraints if necessary.
-class (G.Generic s, GPump' (G.Rep s) f) => GPump s f
-instance (G.Generic s, GPump' (G.Rep s) f) => GPump s f
+-- | Convenient 'Constraint' for satisfying the requirements of 'pump' and
+-- 'dump'.
+type GPump s f = (G.Generic s, GPump' (G.Rep s) f)
 
 class GPump' (s :: k -> *) (f :: * -> *) where
   type GPumped s f :: k -> *
@@ -936,17 +927,9 @@ instance (GPump' sl f, GPump' sr f) => GPump' (sl G.:+: sr) f where
 --------------------------------------------------------------------------------
 
 -- | Ensure that @x@ satisfies all of the constraints listed in @cs@.
-
--- Implementation notice. @All@ and @All'@ have the same semantics, the only
--- difference is that @All@ can be partially applied, whereas @All'@ can't.
--- Thus, we only export @All@
-class All' cs x => All (cs :: [k -> Constraint]) (x :: k)
-instance All' cs x => All cs x
-
--- | Type-family version of 'All'.
-type family All' (cs :: [k -> Constraint]) (x :: k) :: Constraint where
-  All' (c ': cs) x = (c x, All' cs x)
-  All' '[] _ = ()
+type family All (cs :: [k -> Constraint]) (x :: k) :: Constraint where
+  All (c ': cs) x = (c x, All cs x)
+  All '[] _ = ()
 
 -- | Ensure that all of the immeditate children fields of @s@ satisfy @c@.
 --

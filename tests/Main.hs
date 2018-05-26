@@ -1,11 +1,13 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Main where
@@ -25,14 +27,33 @@ import Flay
 
 --------------------------------------------------------------------------------
 
+-- | Just making sure TypeApplications works as expected.
+_test_flay_TypeApplications
+  :: Flayable Trivial s t f g
+  => Flay Trivial s t (f :: k -> *) (g :: k -> *)
+_test_flay_TypeApplications = flay @Trivial
+
+-- | Just making sure TypeApplications works as expected.
+--
+-- Note: This triggers a warning about '-Wsimplifiable-class-constraints'.
+-- I'm not sure how to prevent it.
+_test_flay1_TypeApplications
+  :: Flayable1 Trivial r
+  => Flay Trivial (r f) (r g) (f :: k -> *) (g :: k -> *)
+_test_flay1_TypeApplications = flay1 @Trivial
+
+--------------------------------------------------------------------------------
+
 data Foo f = Foo (f Int) (f Bool)
   deriving (Generic)
 
 flayFoo :: (c Int, c Bool) => Flay c (Foo f) (Foo g) f g
 flayFoo h (Foo a b) = Foo <$> h Dict a <*> h Dict b
 
-instance (c Int, c Bool) => Flayable c (Foo f) (Foo g) f g where flay = gflay
-instance (c Int, c Bool) => Flayable1 c Foo
+instance Fields1 c Foo => Flayable c (Foo f) (Foo g) f g
+
+-- This one should come for free:
+--   instance Fields1 c Foo => Flayable1 c Foo
 
 deriving instance (Eq (f Int), Eq (f Bool)) => Eq (Foo f)
 deriving instance (Show (f Int), Show (f Bool)) => Show (Foo f)
@@ -55,8 +76,9 @@ data Bar f = Bar (f Int) Int
 flayBar :: c Int => Flay c (Bar f) (Bar g) f g
 flayBar h (Bar a b) = Bar <$> h Dict a <*> pure b
 
-instance (c Int) => Flayable c (Bar f) (Bar g) f g where flay = flay1
-instance (c Int) => Flayable1 c Bar where flay1 = flayBar
+-- | Checking 'Fields1' here as well.
+instance Fields1 c Bar => Flayable c (Bar f) (Bar g) f g where flay = flay1
+-- instance (c Int) => Flayable1 c Bar where flay1 = flayBar
 
 deriving instance Eq (f Int) => Eq (Bar f)
 deriving instance Show (f Int) => Show (Bar f)
@@ -100,15 +122,15 @@ main = Tasty.defaultMainWithIngredients
 
 tt :: Tasty.TestTree
 tt = Tasty.testGroup "main"
-  [ QC.testProperty "Flayable: Foo: inner identity law" $
+  [ QC.testProperty "Flayable: Foo: identity law" $
       QC.forAll QC.arbitrary $ \(foo :: Foo Maybe) ->
-         foo === inner flay foo
-  , QC.testProperty "Flayable: Bar: inner identity law" $
+         Identity foo === flay @Trivial (const pure) foo
+  , QC.testProperty "Flayable: Bar: identity law" $
       QC.forAll QC.arbitrary $ \(bar :: Bar Maybe) ->
-         bar === inner flay bar
-  , QC.testProperty "Flayable: Qux: inner identity law" $
+         Identity bar === flay @Trivial (const pure) bar
+  , QC.testProperty "Flayable: Qux: identity law" $
       QC.forAll QC.arbitrary $ \(qux :: Qux Maybe) ->
-         qux === inner flay qux
+         Identity qux === flay @Trivial (const pure) qux
   , QC.testProperty "collectShow: Foo: flayFoo" $
       QC.forAll QC.arbitrary $ \foo@(Foo (Identity a) (Identity b)) ->
          [show a, show b] === collectShow' flayFoo foo
@@ -126,7 +148,7 @@ tt = Tasty.testGroup "main"
          [show a] === collectShow' flay bar
   , QC.testProperty "collectShow: Bar: flay1" $
       QC.forAll QC.arbitrary $ \bar@(Bar (Identity a) _) ->
-         [show a] === collectShow' flay bar
+         [show a] === collectShow' flay1 bar
   ]
 
 

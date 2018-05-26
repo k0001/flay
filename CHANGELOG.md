@@ -1,11 +1,21 @@
 # Version 0.3.1
 
-* BREAKING CHANGE: Fixed `TypeApplications` for `flay1` so that @c@ comes
-  first.
+* COMPILER ASSISTED BREAKING CHANGE: Fixed `TypeApplications` for `flay1` so
+  that @c@ comes first.
+
+* COMPILER ASSISTED BREAKING CHANGE: Not exporting `GFlay'`, `gflay'`,
+  `gterminal` anymore.
+
+* COMPILER ASSISTED BREAKING CHANGE: `GFlay1` and `All` are now type synonyms
+  rather than classes.
 
 * Added `pump`, `dump`, `Pump` and `GPump`.
 
-* Added `GFlay'` and `GTerminal` instances for `GHC.Generics.U1`.
+* Added `GFlay1`, `gflay1`.
+
+* Added `GTerminal` instance for `GHC.Generics.U1`.
+
+* Added overlappable `GFlay'` instance for `GHC.Generics.K1` not wrapped by @f@.
 
 * Added `Fields`, `GFields`, `Fields1` and `GFields1`.
 
