@@ -106,7 +106,13 @@ import Unsafe.Coerce (unsafeCoerce)
 --
 -- /to flay: tr. v., to strip off the skin or surface of./
 --
--- /Mnemonic for @c s t f g@: Common STandard FoG./
+-- Mnemonic for @c s t f g@: Much like lenses have type indexes @s t a b@ where
+-- @s@ is the input state, @t@ is the output state@, and @a@ and @b@ are the
+-- input and output /values/ respectively, in 'Flay', @s@ and @t@ represent the
+-- input and output states like in lenses, and @f@ and @g@ represent the
+-- /wrappers/ over the input and output values respectively. The @c@ comes at
+-- the very beginning because it is the type you are expected to apply with
+-- 'TypeApplications' if necessary.
 --
 -- ==== Example 1: Removing uncertainty
 --
