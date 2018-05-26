@@ -169,7 +169,7 @@ tt = Tasty.testGroup "main"
              h :: Dict (Read a) -> Identity a -> State Int (Maybe a)
              h Dict _ = state (\i -> (Text.Read.readMaybe (show i), i+1))
              spzoo1 :: State Int (Pump Zoo Maybe)
-             spzoo1 = flay h pzoo0
+             spzoo1 = flay1 h pzoo0
              pzoo1 :: Pump Zoo Maybe
              pzoo1 = evalState spzoo1 i0
              yzoo1 :: Maybe Zoo
