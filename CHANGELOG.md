@@ -1,4 +1,4 @@
-# Version 0.3.1
+# Version 0.4
 
 * COMPILER ASSISTED BREAKING CHANGE: Fixed `TypeApplications` for `flay1` so
   that @c@ comes first.

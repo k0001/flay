@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "flay";
-  version = "0.3";
+  version = "0.4";
   src = ./.;
   libraryHaskellDepends = [ base constraints transformers ];
   testHaskellDepends = [ base tasty tasty-quickcheck transformers ];
