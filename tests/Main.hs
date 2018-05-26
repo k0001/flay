@@ -52,10 +52,8 @@ data Foo f = Foo (f Int) (f Bool)
 flayFoo :: (c Int, c Bool) => Flay c (Foo f) (Foo g) f g
 flayFoo h (Foo a b) = Foo <$> h Dict a <*> h Dict b
 
-instance FieldsF c Foo => Flayable c (Foo f) (Foo g) f g
-
--- This one should come for free, but we have disabled that temporarily.
-instance FieldsF c Foo => Flayable1 c Foo
+-- This one is actually free:
+--   instance FieldsF c Foo => Flayable c (Foo f) (Foo g) f g
 
 deriving instance (Eq (f Int), Eq (f Bool)) => Eq (Foo f)
 -- Testing 'Fields' here as well.
@@ -80,8 +78,7 @@ flayBar :: c Int => Flay c (Bar f) (Bar g) f g
 flayBar h (Bar a b) = Bar <$> h Dict a <*> pure b
 
 -- | Checking 'FieldsF' here as well.
-instance FieldsF c Bar => Flayable c (Bar f) (Bar g) f g where flay = flay1
-instance (c Int) => Flayable1 c Bar where flay1 = flayBar
+instance FieldsF c Bar => Flayable c (Bar f) (Bar g) f g where flay = flayBar
 
 deriving instance Eq (f Int) => Eq (Bar f)
 deriving instance Show (f Int) => Show (Bar f)

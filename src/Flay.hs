@@ -31,7 +31,8 @@ module Flay
  ( Flay
  -- * Flayable
  , Flayable(flay)
- , Flayable1(flay1)
+ , Flayable1
+ , flay1
  -- ** Generics
  , gflay
  , GFlay
@@ -77,6 +78,7 @@ import Data.Functor.Const (Const(Const, getConst))
 import Data.Typeable (Typeable)
 import qualified GHC.Generics as G
 import Prelude hiding (zip)
+import Unsafe.Coerce (unsafeCoerce)
 
 --------------------------------------------------------------------------------
 
@@ -419,69 +421,35 @@ instance {-# OVERLAPPABLE #-}
 --------------------------------------------------------------------------------
 
 -- | 'Flayable1' is 'Flayable' specialized for the common case of @s ~ r f@ and
--- @t ~ r g@. The rationale for introducing this seemingly redundant class is
--- that the 'Flayable1' constraint is less verbose than 'Flayable'.
+-- @t ~ r g@. The rationale for introducing this seemingly redundant constraint
+-- is that 'Flayable1' is less verbose than 'Flayable'.
+
+-- Implementors note:
 --
--- Unfortunately, we can't readily existentialize the arguments to 'Flayable',
--- which is why you'll need to specify both 'Flayable1' and 'Flayable'
--- instances. Notice, however, that 'flay' can be defined in terms of
--- 'flay1', so this should be very mechanical.
---
--- @
--- 'Flayable1' :: (k -> 'Constraint') -> ((k -> *) -> *) -> 'Constraint'
--- @
-
--- Note: We can't explicitly kind c and r because it breaks TypeApplications for
--- 'flay1'.
-class Flayable1 c r where
-  -- | If @r f@ and @r g@ are instances of 'G.Generic', then 'flay1' gets a
-  -- default implementation. For example, provided the @Foo@ datatype shown in
-  -- the documentation for 'Flay' had a 'G.Generic' instance, then the following
-  -- 'Flayable' instance would get a default implementation for 'flay1':
-  --
-  -- @
-  -- instance (c 'Int', c 'Bool') => 'Flayable1' c Foo
-  -- @
-  flay1 :: Flay c (r f) (r g) f g
-  default flay1 :: GFlay c (r f) (r g) f g => Flay c (r f) (r g) f g
-  flay1 = gflay
-  {-# INLINE flay1 #-}
-
-{- THIS SHOULD BE FINE, but we are not 100% certain yet, so we'll leave it out
-   for now.
-
--- | All datatypes parametrized over some type constructor @f :: k -> *@ that
--- have a 'G.Generic' instance get a 'Flayable1' instance for free. For example:
+-- If we had @QuantifiedConstraints@, then 'Flayable1' would be something like:
 --
 -- @
--- data Foo f = Foo (f 'Int') (f 'Bool')
---   deriving ('G.Generic')
+-- 'Flayable1' c r
+--    ==  forall (f :: k -> *) (g :: k -> *).
+--          'Flayable' c (r f) (r g) f g
 -- @
 --
--- This is an @OVERLAPPABLE@ instance, meaning that you can provide a different
--- instance for your 'G.Generic' datatype, if necessary.
-instance {-# OVERLAPPABLE #-} GFlay1 c r => Flayable1 c r where
-  flay1 = gflay1
-  {-# INLINE flay1 #-}
+-- Currently, however, 'Flayable1' is using some of the skolem trickery
+-- described in detail in "Data.Constraint.Forall". However, the approach taken
+-- suffers from the soundness issues described there. We need to use something
+-- like the 'Skolem' type family, rather than un-exported 'F' and 'G'.
+type Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *)
+  = Flayable c (r F) (r G) F G
 
--- | Convenient 'Constraint' for satisfying the requirements of 'gflay1'.
-type GFlay1 c r = GFlay c (r F) (r G) F G
-
--- OH MY EYES! I think we can implement this nicely using Generic1, by having
--- some GFlay1' class similar to GFlay' but relying on Generic1. However, I
--- tried to do that and failed. Please send help!
---
--- So, since by design neither @f@ nor @g@ show up in @'GFlay1' c r@, looking
--- up the proper 'GFlay'' instance to dispatch to is not really possible. So,
--- we pick @f@ and @g@ to be 'F' and 'G', and then coerce between them and @f@
--- and @g@ respectively, which seems to work fine.
-gflay1 :: GFlay1 c r => Flay c (r f) (r g) f g
-{-# INLINE gflay1 #-}
-gflay1 = \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
-  unsafeCoerce (gflay (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
-                      (unsafeCoerce rf :: r F)
-                  :: m (r G))
--}
+-- | Like 'flay', but specialized to work on 'Flayable1'.
+flay1 :: forall c r f g. Flayable1 c r => Flay c (r f) (r g) f g
+{-# INLINE flay1 #-}
+flay1 =
+  let flFG = flay :: Flay c (r F) (r G) F G
+  in \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
+         unsafeCoerce (flFG (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
+                            (unsafeCoerce rf :: r F)
+                         :: m (r G))
 
 --------------------------------------------------------------------------------
 
@@ -1073,7 +1041,6 @@ type family GFieldsF (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Cons
 -- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
 data F (a :: k)
 
--- Commented out since this is used by GFlay1, which is on stand by.
--- -- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
--- data G (a :: k)
+-- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
+data G (a :: k)
 
