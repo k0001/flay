@@ -35,8 +35,8 @@ module Flay
  -- ** Generics
  , gflay
  , GFlay
- , gflay1
- , GFlay1
+ -- , gflay1
+ -- , GFlay1
  -- ** Utils
  , All
  , Trivial
@@ -77,7 +77,6 @@ import Data.Functor.Const (Const(Const, getConst))
 import Data.Typeable (Typeable)
 import qualified GHC.Generics as G
 import Prelude hiding (zip)
-import Unsafe.Coerce (unsafeCoerce)
 
 --------------------------------------------------------------------------------
 
@@ -296,7 +295,15 @@ import Unsafe.Coerce (unsafeCoerce)
 -- explicitly type the received @'Dict'@ unless the @c@ argument to 'Flay' has
 -- been explicitly by other means (like in the definition of 'trivial'', where
 -- we don't have to explicitly type 'Dict' because @c ~ 'Trivial'@ according to
--- the top level signature of 'trivial'').
+-- the top level signature of 'trivial''). Using the @TypeApplications@ GHC
+-- extension might make things easier:
+--
+-- @
+-- fooMaybeToIdentityIO :: Foo 'Maybe' -> 'IO' (Foo 'Identity')
+-- fooMaybeToIdentityIO = flayFoo @Read (\\'Dict' -> \\case
+--     'Nothing' -> 'fmap' 'pure' prompt
+--     'Just' a -> 'pure' ('pure' a))
+-- @
 --
 -- Example using this in GHCi:
 --
@@ -366,7 +373,9 @@ type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 -- @
 --
 -- But actually, this library exports an @OVERLAPPABLE@ instance that covers
--- datatypes like 'Foo' above, so
+-- datatypes like 'Foo' above. That is, datatypes parametrized by some type
+-- constructor where that type constructor wraps each of the immediate children
+-- fields. So
 -- /most times you don't even need to write the 'Flayable' instance yourself/.
 -- That is, a @'Flayable' c (r f) (r g) f g@ for @r@ types parametrized by a
 -- type-constructor, such as 'Foo', having 'G.Generic' instances.
@@ -438,6 +447,8 @@ class Flayable1 c r where
   flay1 = gflay
   {-# INLINE flay1 #-}
 
+{- THIS SHOULD BE FINE, but we are not 100% certain yet, so we'll leave it out
+   for now.
 
 -- | All datatypes parametrized over some type constructor @f :: k -> *@ that
 -- have a 'G.Generic' instance get a 'Flayable1' instance for free. For example:
@@ -470,6 +481,7 @@ gflay1 = \(h0 :: Dict (c a0) -> f a0 -> m (g a0)) (rf :: r f) ->
   unsafeCoerce (gflay (unsafeCoerce h0 :: Dict (c a1) -> F a1 -> m (G a1))
                       (unsafeCoerce rf :: r F)
                   :: m (r G))
+-}
 
 --------------------------------------------------------------------------------
 
@@ -561,9 +573,25 @@ instance c a => GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
   gflay' h (G.K1 fa) = G.K1 <$> h Dict fa
   {-# INLINE gflay' #-}
 
+{- Enabling this breaks gflay, when used from flay1. This instance is the one that
+   allows us to use GFlay with a datatype where not all its fields are parametrized
+   by some type constructor (e.g., data Foo f = Foo (f Int) Bool).
+
+    • Overlapping instances for Flay.GFlay' c (G.K1 G.R (f Int)) (G.K1 G.R (g Int)) f g
+        arising from a use of ‘Flay.$dmflay1’
+      Matching instances:
+        instance [safe]
+          forall k1 k2 (c :: k2 -> Constraint) (a :: k2) r (f :: k2 -> *) (g :: k2 -> *).
+          c a =>
+          Flay.GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g
+        instance [overlappable] [safe]
+          forall k1 k2 (c :: k2 -> Constraint) r a (f :: k2 -> *) (g :: k2 -> *).
+          Flay.GFlay' c (G.K1 r a) (G.K1 r a) f g
+
 instance {-# OVERLAPPABLE #-} GFlay' c (G.K1 r a) (G.K1 r a) f g where
   gflay' _ (G.K1 a) = pure (G.K1 a)
   {-# INLINE gflay' #-}
+-}
 
 instance (GFlay' c s t f g)
   => GFlay' c (G.M1 i j s) (G.M1 i j t) f g where
@@ -808,7 +836,7 @@ unsafeZip fl1 fl2 fl3 pair = \s1 s2 -> runMaybeT $ do
 --    let pbar0 :: 'Pump' Bar 'Identity'
 --        pbar0 = 'pump' 'Identity' bar0
 --    let h :: 'Dict' ('Read' a) -> 'Identity' a -> 'IO' ('Maybe' a)
---        h 'Dict' ('Identity' _) = 'fmap' 'Text.readMaybe' 'getLine'
+--        h 'Dict' ('Identity' _) = 'fmap' 'Text.Read.readMaybe' 'getLine'
 --    pbar1 :: 'Pump' Bar 'Maybe' <- 'flay' h pbar0
 --    -- We convert the 'Maybe's to 'Either' just for demonstration purposes.
 --    -- Using 'dump' 'id' would have been enough to make this function
@@ -848,6 +876,9 @@ instance
   => Flayable c (Pump s f) (Pump s g) f g where
   flay h (Pump rep) = Pump <$> gflay' h rep
   {-# INLINE flay #-}
+
+-- Giving a Flayable1 instance to Pump is a bit more tricky, so we are not
+-- doing it for the time being.
 
 -- | Wrap @s@ in 'Pump' so that it can be 'flay'ed.
 --
@@ -1042,6 +1073,7 @@ type family GFields1 (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Cons
 -- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
 data F (a :: k)
 
--- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
-data G (a :: k)
+-- Commented out since this is used by GFlay1, which is on stand by.
+-- -- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
+-- data G (a :: k)
 

@@ -39,6 +39,7 @@ test-suite tests
     base,
     flay,
     tasty,
-    tasty-quickcheck
+    tasty-quickcheck,
+    transformers
 
 

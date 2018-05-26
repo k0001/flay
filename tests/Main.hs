@@ -13,6 +13,7 @@
 module Main where
 
 import Control.Monad (join)
+import Control.Monad.Trans.State.Strict (State, state, evalState)
 import Data.Functor.Const (Const(Const))
 import Data.Functor.Identity (Identity(Identity), runIdentity)
 import GHC.Exts (Constraint)
@@ -22,6 +23,7 @@ import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===))
 import qualified Test.Tasty.QuickCheck as QC
+import qualified Text.Read
 
 import Flay
 
@@ -52,11 +54,12 @@ flayFoo h (Foo a b) = Foo <$> h Dict a <*> h Dict b
 
 instance Fields1 c Foo => Flayable c (Foo f) (Foo g) f g
 
--- This one should come for free:
---   instance Fields1 c Foo => Flayable1 c Foo
+-- This one should come for free, but we have disabled that temporarily.
+instance Fields1 c Foo => Flayable1 c Foo
 
 deriving instance (Eq (f Int), Eq (f Bool)) => Eq (Foo f)
-deriving instance (Show (f Int), Show (f Bool)) => Show (Foo f)
+-- Testing 'Fields' here as well.
+deriving instance Fields Show (Foo f) => Show (Foo f)
 
 instance (QC.Arbitrary (f Int), QC.Arbitrary (f Bool)) => QC.Arbitrary (Foo f) where
   arbitrary = Foo <$> QC.arbitrary <*> QC.arbitrary
@@ -78,7 +81,7 @@ flayBar h (Bar a b) = Bar <$> h Dict a <*> pure b
 
 -- | Checking 'Fields1' here as well.
 instance Fields1 c Bar => Flayable c (Bar f) (Bar g) f g where flay = flay1
--- instance (c Int) => Flayable1 c Bar where flay1 = flayBar
+instance (c Int) => Flayable1 c Bar where flay1 = flayBar
 
 deriving instance Eq (f Int) => Eq (Bar f)
 deriving instance Show (f Int) => Show (Bar f)
@@ -111,6 +114,19 @@ instance (QC.Arbitrary (f Int), QC.Arbitrary (f Bool)) => QC.Arbitrary (Qux f) w
   arbitrary = QC.oneof [ Qux1 <$> QC.arbitrary <*> QC.arbitrary
                        , Qux2 <$> QC.arbitrary <*> QC.arbitrary
                        , Qux3 <$> QC.arbitrary ]
+
+--------------------------------------------------------------------------------
+
+data Zoo
+  = Zoo0
+  | Zoo1 Int
+  | Zoo2 Int Int
+  deriving (Generic, Eq, Show)
+
+instance QC.Arbitrary Zoo where
+  arbitrary = QC.oneof [ pure Zoo0
+                       , pure Zoo1 <*> QC.arbitrary
+                       , pure Zoo2 <*> QC.arbitrary <*> QC.arbitrary ]
 
 --------------------------------------------------------------------------------
 
@@ -149,6 +165,21 @@ tt = Tasty.testGroup "main"
   , QC.testProperty "collectShow: Bar: flay1" $
       QC.forAll QC.arbitrary $ \bar@(Bar (Identity a) _) ->
          [show a] === collectShow' flay1 bar
+  , QC.testProperty "pump/flay/dump: Zoo" $
+      QC.forAll QC.arbitrary $ \(zoo0 :: Zoo, i0 :: Int) ->
+         let pzoo0 :: Pump Zoo Identity
+             pzoo0 = pump Identity zoo0
+             h :: Dict (Read a) -> Identity a -> State Int (Maybe a)
+             h Dict _ = state (\i -> (Text.Read.readMaybe (show i), i+1))
+             spzoo1 :: State Int (Pump Zoo Maybe)
+             spzoo1 = flay h pzoo0
+             pzoo1 :: Pump Zoo Maybe
+             pzoo1 = evalState spzoo1 i0
+             yzoo1 :: Maybe Zoo
+             yzoo1 = dump id pzoo1
+         in yzoo1 === Just (case zoo0 of Zoo0 -> Zoo0
+                                         Zoo1{} -> Zoo1 i0
+                                         Zoo2{} -> Zoo2 i0 (i0+1))
   ]
 
 
