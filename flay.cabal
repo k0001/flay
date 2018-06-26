@@ -1,5 +1,5 @@
 name: flay
-version: 0.4
+version: 0.5
 author: Renzo Carbonara
 maintainer: renλren!zone
 copyright: Renzo Carbonara 2017-2018
@@ -9,10 +9,8 @@ extra-source-files: README.md CHANGELOG.md
 category: Data, Generics
 build-type: Simple
 cabal-version: >=1.18
-synopsis: Work generically on your datatype without knowing its shape nor its contents.
-description:
-  Work generically on your datatype without knowing its shape nor its contents using
-  a principlied approach.
+synopsis: Generic programming for higher-kinded types.
+description: Generic programming for higher-kinded types.
 homepage: https://github.com/k0001/flay
 bug-reports: https://github.com/k0001/flay/issues
 source-repository head

@@ -1,3 +1,11 @@
+# Version 0.5
+
+* COMPILER ASSISTED BREAKING CHANGE: Fixed `TypeApplications` for `zip1` so
+  that @c@ comes first.
+
+* Documentation improvements.
+
+
 # Version 0.4
 
 * COMPILER ASSISTED BREAKING CHANGE: Fixed `TypeApplications` for `flay1` so

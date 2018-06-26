@@ -123,6 +123,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- Consider the following types and values:
 --
 -- @
+-- -- | Foo is a higher-kinded type parametrized over some @f :: * -> *@.
 -- data Foo f = Foo (f 'Int') (f 'Bool')
 --
 -- deriving instance ('Show' (f 'Int'), 'Show' (f 'Bool')) => 'Show' (Foo f)
@@ -360,7 +361,7 @@ import Unsafe.Coerce (unsafeCoerce)
 --
 type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
   = forall m. Applicative m
-       => (forall (a :: k). Dict (c a) -> f a -> m (g a)) -> s -> m t
+       => (forall a. Dict (c a) -> f a -> m (g a)) -> s -> m t
 
 --------------------------------------------------------------------------------
 
@@ -693,23 +694,24 @@ instance (GTerminal l, GTerminal r) => GTerminal (l G.:*: r) where
 -- > let foo2 = 'Foo' ('Just' 1) 'Nothing'
 -- >   :: 'Foo' 'Maybe'
 --
--- > 'zip1' (\('Dict' :: 'Dict' ('Trivial' x)) a b -> 'Data.Functor.Product.Pair' a b) foo1 foo2
--- >   :: 'Foo' ('Data.Functor.Product.Product' 'Data.Functor.Identity.Identity' 'Maybe')
--- 'Foo' ('Data.Functor.Product.Pair' ('Data.Functor.Identity.Identity' 0) ('Just' 1)) ('Data.Functor.Product.Pair' ('Data.Functor.Identity.Identity' 'False') 'Nothing')
+-- > 'zip1' (\('Dict' :: 'Dict' ('Trivial' x)) a b -> 'pure' ('Data.Functor.Product.Pair' a b)) foo1 foo2
+-- >   :: 'Applicative' m => m ('Maybe' ('Foo' ('Data.Functor.Product.Product' 'Data.Functor.Identity.Identity' 'Maybe')))
+-- 'Just' ('Foo' ('Data.Functor.Product.Pair' ('Data.Functor.Identity.Identity' 0) ('Just' 1)) ('Data.Functor.Product.Pair' ('Data.Functor.Identity.Identity' 'False') 'Nothing'))
 --
 -- > 'zip1' (\('Dict' :: 'Dict' ('Show' x)) ('Data.Functor.Identity.Identity' a) yb -> case yb of
--- >           'Nothing' -> 'Const' ('show' a)
--- >           'Just' b  -> 'Const' ('show' (a, b)) )
+-- >           'Nothing' -> 'pure' ('Const' ('show' a))
+-- >           'Just' b  -> 'pure' ('Const' ('show' (a, b))) )
 -- >      foo1 foo2
--- >   :: Foo ('Const' 'String')
--- Foo ('Const' \"(0,1)\") ('Const' \"False\")
+-- >   :: 'Applicative' m => m ('Maybe' (Foo ('Const' 'String')))
+-- 'Just' (Foo ('Const' \"(0,1)\") ('Const' \"False\"))
 -- @
 --
 -- Returns 'Nothing' in case the indivual target types do not match.
 --
 -- Note: 'zip1' is safer but less general than 'unsafeZip'.
 zip1
-  :: (Monad m, Typeable f, Flayable1 c s, Flayable1 Typeable s)
+  :: forall c s f g h m
+  .  (Monad m, Typeable f, Flayable1 c s, Flayable1 Typeable s)
   => (forall x. Dict (c x) -> f x -> g x -> m (h x))
   -> s f
   -> s g
@@ -725,7 +727,9 @@ zip1 h = unsafeZip flay1 flay1 flay1 h
 --
 -- Note: 'zip' is safer but less general than 'unsafeZip'.
 zip
-  :: ( Monad m, Typeable f
+  :: forall c s1 s2 t1 t2 t3 f g h m
+  .  ( Monad m
+     , Typeable f
      , Flayable Typeable s1 t1 f (Const ())
      , Flayable Typeable s2 t2 g (Product f g)
      , Flayable c t2 t3 (Product f g) h )
