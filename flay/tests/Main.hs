@@ -16,6 +16,7 @@ import Control.Monad (join)
 import Control.Monad.Trans.State.Strict (State, state, evalState)
 import Data.Functor.Const (Const(Const))
 import Data.Functor.Identity (Identity(Identity), runIdentity)
+import Data.Kind
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import qualified GHC.Generics as G
@@ -32,8 +33,8 @@ import Flay
 -- | Just making sure TypeApplications works as expected.
 _test_flay_TypeApplications
   :: Flayable Trivial s t f g
-  => Flay Trivial s t (f :: k -> *) (g :: k -> *)
-_test_flay_TypeApplications = flay @Trivial
+  => Flay Trivial s t (f :: k -> Type) (g :: k -> Type)
+_test_flay_TypeApplications = flay @_ @Trivial
 
 -- | Just making sure TypeApplications works as expected.
 --
@@ -41,7 +42,7 @@ _test_flay_TypeApplications = flay @Trivial
 -- I'm not sure how to prevent it.
 _test_flay1_TypeApplications
   :: Flayable1 Trivial r
-  => Flay Trivial (r f) (r g) (f :: k -> *) (g :: k -> *)
+  => Flay Trivial (r f) (r g) (f :: k -> Type) (g :: k -> Type)
 _test_flay1_TypeApplications = flay1 @Trivial
 
 --------------------------------------------------------------------------------
@@ -137,13 +138,13 @@ tt :: Tasty.TestTree
 tt = Tasty.testGroup "main"
   [ QC.testProperty "Flayable: Foo: identity law" $
       QC.forAll QC.arbitrary $ \(foo :: Foo Maybe) ->
-         Identity foo === flay @Trivial (const pure) foo
+         Identity foo === flay @_ @Trivial (const pure) foo
   , QC.testProperty "Flayable: Bar: identity law" $
       QC.forAll QC.arbitrary $ \(bar :: Bar Maybe) ->
-         Identity bar === flay @Trivial (const pure) bar
+         Identity bar === flay @_ @Trivial (const pure) bar
   , QC.testProperty "Flayable: Qux: identity law" $
       QC.forAll QC.arbitrary $ \(qux :: Qux Maybe) ->
-         Identity qux === flay @Trivial (const pure) qux
+         Identity qux === flay @_ @Trivial (const pure) qux
   , QC.testProperty "collectShow: Foo: flayFoo" $
       QC.forAll QC.arbitrary $ \foo@(Foo (Identity a) (Identity b)) ->
          [show a, show b] === collectShow' flayFoo foo

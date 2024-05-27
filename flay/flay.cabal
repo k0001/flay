@@ -1,14 +1,14 @@
+cabal-version: 1.18
 name: flay
 version: 0.5
 author: Renzo Carbonara
 maintainer: renλren!zone
-copyright: Renzo Carbonara 2017-2018
+copyright: Renzo Carbonara 2017
 license: BSD3
 license-file: LICENSE.txt
 extra-source-files: README.md CHANGELOG.md
 category: Data, Generics
 build-type: Simple
-cabal-version: >=1.18
 synopsis: Generic programming for higher-kinded types.
 description: Generic programming for higher-kinded types.
 homepage: https://github.com/k0001/flay
@@ -34,7 +34,7 @@ test-suite tests
   hs-source-dirs: tests
   main-is: Main.hs
   build-depends:
-    base,
+    base >=4.9 && <5.0,
     flay,
     tasty,
     tasty-quickcheck,

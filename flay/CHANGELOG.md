@@ -5,6 +5,8 @@
 
 * Documentation improvements.
 
+* Fixed compilation with GHC 9.8.
+
 
 # Version 0.4
 

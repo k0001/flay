@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -75,10 +76,11 @@ module Flay
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (StateT(StateT), runStateT)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
-import Data.Constraint (Constraint, Dict(Dict))
+import Data.Constraint (Dict(Dict))
 import Data.Dynamic (Dynamic, toDyn, fromDynamic)
 import Data.Functor.Product (Product(Pair))
 import Data.Functor.Const (Const(Const, getConst))
+import Data.Kind
 import Data.Typeable (Typeable)
 import qualified GHC.Generics as G
 import Prelude hiding (zip)
@@ -123,7 +125,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- Consider the following types and values:
 --
 -- @
--- -- | Foo is a higher-kinded type parametrized over some @f :: * -> *@.
+-- -- | Foo is a higher-kinded type parametrized over some @f :: 'Type' -> 'Type'@.
 -- data Foo f = Foo (f 'Int') (f 'Bool')
 --
 -- deriving instance ('Show' (f 'Int'), 'Show' (f 'Bool')) => 'Show' (Foo f)
@@ -359,7 +361,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- about the targets themselves beyond the fact that they satisfy a particular
 -- constraint.
 --
-type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+type Flay (c :: k -> Constraint) s t (f :: k -> Type) (g :: k -> Type)
   = forall m. Applicative m
        => (forall a. Dict (c a) -> f a -> m (g a)) -> s -> m t
 
@@ -406,14 +408,14 @@ type Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
 -- @
 --
 -- Notice that 'flay' can be defined in terms of 'flay1' as well.
-class Flayable (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+class Flayable (c :: k -> Constraint) s t (f :: k -> Type) (g :: k -> Type)
   | s -> f, t -> g, s g -> t, t f -> s where
   flay :: Flay c s t f g
   default flay :: GFlay c s t f g => Flay c s t f g
   flay = gflay
   {-# INLINE flay #-}
 
--- | All datatypes parametrized over some type constructor @f :: k -> *@ that
+-- | All datatypes parametrized over some type constructor @f :: k -> 'Type'@ that
 -- have a 'G.Generic' instance get a 'Flayable' instance for free. For example:
 --
 -- @
@@ -440,25 +442,25 @@ instance {-# OVERLAPPABLE #-}
 --
 -- @
 -- 'Flayable1' c r
---    ==  forall (f :: k -> *) (g :: k -> *).
+--    ==  forall (f :: k -> 'Type') (g :: k -> 'Type').
 --           'Flayable' c (r f) (r g) f g
 -- @
 
 -- Implementors note: Currently, 'Flayable1' is uses some of the skolem trickery
 -- described in detail in "Data.Constraint.Forall", specialized to 'Flayable'.
-type family Flayable1 (c :: k -> Constraint) (r :: (k -> *) -> *) :: Constraint where
+type family Flayable1 (c :: k -> Constraint) (r :: (k -> Type) -> Type) :: Constraint where
   Flayable1 c r = Flayable1_ c r
 
 -- | This inner 'Flayable1_' class prevents the skolem from leaking to the user.
 class Flayable1K c r (Skolem (Flayable1K c r))
-  => Flayable1_ (c :: k -> Constraint) (r :: (k -> *) -> *)
+  => Flayable1_ (c :: k -> Constraint) (r :: (k -> Type) -> Type)
 instance Flayable1K c r (Skolem (Flayable1K c r))
   => Flayable1_ c r
 
 -- | Like @Flayable c (r F) (r G) F G@, but with a superfluous trailing @x@
 -- to match the kind expected by 'Skolem'.
 class Flayable c (r F) (r G) F G
-  => Flayable1K (c :: k -> Constraint) (r :: (k -> *) -> *) (x :: *)
+  => Flayable1K (c :: k -> Constraint) (r :: (k -> Type) -> Type) (x :: Type)
 instance Flayable c (r F) (r G) F G
   => Flayable1K c r x
 
@@ -482,7 +484,7 @@ flay1 =
 -- This can be used as the @c@ parameter to 'Flay' or 'Flayable' in case you are
 -- not interested in observing the values inside @f@.
 class Trivial (a :: k)
-instance Trivial (a :: k)
+instance Trivial a
 
 -- | Given a 'Flay' for any constraint @c@ obtain a 'Flay' for a 'Trivial'
 -- constraint.
@@ -543,14 +545,14 @@ trivial1 = trivial' (flay1 :: Flay Trivial (r f) (r g) f g)
 --------------------------------------------------------------------------------
 
 -- | Convenient 'Constraint' for satisfying the requirements of 'gflay'.
-type GFlay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+type GFlay (c :: k -> Constraint) s t (f :: k -> Type) (g :: k -> Type)
   = (GFlay' c (G.Rep s) (G.Rep t) f g, G.Generic s, G.Generic t)
 
-gflay :: GFlay c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *)
+gflay :: GFlay c s t f g => Flay (c :: k -> Constraint) s t (f :: k -> Type) (g :: k -> Type)
 gflay = \h s -> G.to <$> gflay' h (G.from s)
 {-# INLINE gflay #-}
 
-class GFlay' (c :: k -> Constraint) s t (f :: k -> *) (g :: k -> *) where
+class GFlay' (c :: k -> Constraint) s t (f :: k -> Type) (g :: k -> Type) where
   gflay' :: Flay c (s p) (t p) f g
 
 instance GFlay' c G.V1 G.V1 f g where
@@ -573,11 +575,11 @@ instance c a => GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g where
         arising from a use of ‘Flay.$dmflay1’
       Matching instances:
         instance [safe]
-          forall k1 k2 (c :: k2 -> Constraint) (a :: k2) r (f :: k2 -> *) (g :: k2 -> *).
+          forall k1 k2 (c :: k2 -> Constraint) (a :: k2) r (f :: k2 -> 'Type') (g :: k2 -> 'Type').
           c a =>
           Flay.GFlay' c (G.K1 r (f a)) (G.K1 r (g a)) f g
         instance [overlappable] [safe]
-          forall k1 k2 (c :: k2 -> Constraint) r a (f :: k2 -> *) (g :: k2 -> *).
+          forall k1 k2 (c :: k2 -> Constraint) r a (f :: k2 -> 'Type') (g :: k2 -> 'Type').
           Flay.GFlay' c (G.K1 r a) (G.K1 r a) f g
 
 instance {-# OVERLAPPABLE #-} GFlay' c (G.K1 r a) (G.K1 r a) f g where
@@ -662,7 +664,7 @@ instance Terminal (Const () a) where
   {-# INLINE terminal #-}
 
 ---
-class GTerminal (f :: * -> *) where
+class GTerminal (f :: Type -> Type) where
   gterminal :: f p
 
 instance GTerminal G.U1 where
@@ -767,9 +769,10 @@ unsafeZip fl1 fl2 fl3 pair = \s1 s2 -> runMaybeT $ do
    f1 :: Dict (Typeable a) -> f a -> [Dynamic]
    f1 = \Dict !fa -> [toDyn fa :: Dynamic]
    f2 :: Dict (Typeable a) -> g a -> StateT [Dynamic] (MaybeT m) (Product f g a)
-   f2 = \Dict !ga -> StateT $ \(x:xs) -> do
-      !(fa :: f a) <- MaybeT (pure (fromDynamic x))
-      pure (Pair fa ga, xs)
+   f2 = \Dict !ga -> StateT $ \case
+            (x:xs) -> do !(fa :: f a) <- MaybeT (pure (fromDynamic x))
+                         pure (Pair fa ga, xs)
+            [] -> error "Flay.unsafeZip"
    f3 :: Dict (c a) -> Product f g a -> m (h a)
    f3 = \Dict (Pair fa ga) -> pair Dict fa ga
 
@@ -779,7 +782,7 @@ unsafeZip fl1 fl2 fl3 pair = \s1 s2 -> runMaybeT $ do
 -- | Wrapper allowing a 'G.Generic' non 'Flayable' type to become 'Flayable'.
 --
 -- Most datatypes that can have useful 'Flayable' instances are often
--- parametrized by a type constructor @f :: k -> *@, and have all or some of
+-- parametrized by a type constructor @f :: k -> 'Type'@, and have all or some of
 -- their fields wrapped in said @f@, like so:
 --
 -- @
@@ -903,8 +906,8 @@ dump f = \(Pump rep) -> G.to <$> gdump f rep
 -- 'dump'.
 type GPump s f = (G.Generic s, GPump' (G.Rep s) f)
 
-class GPump' (s :: k -> *) (f :: * -> *) where
-  type GPumped s f :: k -> *
+class GPump' (s :: k -> Type) (f :: Type -> Type) where
+  type GPumped s f :: k -> Type
   gpump :: (forall a. a -> f a) -> s p -> GPumped s f p
   gdump :: Applicative m => (forall a. f a -> m a) -> GPumped s f p -> m (s p)
 
@@ -1009,7 +1012,7 @@ type Fields c s = GFields c (G.Rep s)
 -- This 'Constraint' ensures that @c@ is satsfieds by all of the 'G.K1' types
 -- appearing in @s@, which is expected to be one of the various 'G.Generic'
 -- representation types.
-type family GFields (c :: kc -> Constraint) (s :: ks -> *) :: Constraint where
+type family GFields (c :: kc -> Constraint) (s :: ks -> Type) :: Constraint where
   GFields _ G.V1 = ()
   GFields _ G.U1 = ()
   GFields c (G.K1 _ a) = (c a)
@@ -1041,16 +1044,16 @@ type family GFields (c :: kc -> Constraint) (s :: ks -> *) :: Constraint where
 -- where the number of types contained in @f@ is larger. That is:
 --
 -- @
--- forall (c :: * -> 'Constraint').
+-- forall (c :: 'Type' -> 'Constraint').
 --    'FieldsF' c 'Foo'  ==  (c 'Int', c 'Bool')
 -- @
 --
--- Notice that 'FieldsF' only works with types of kind @(k -> *) -> *@ such as
+-- Notice that 'FieldsF' only works with types of kind @(k -> 'Type') -> 'Type'@ such as
 -- 'Foo'. That is, types that are parametrized by a type constructor.
 
 -- This type-family vs. class dance is so that 'F' doesn't show up in the public
 -- API (that is, in 'FieldsF').
-type family FieldsF (c :: k -> Constraint) (r :: (k -> *) -> *) :: Constraint where
+type family FieldsF (c :: k -> Constraint) (r :: (k -> Type) -> Type) :: Constraint where
   FieldsF c r = FieldsF_ c r
 class GFieldsF c (G.Rep (r F)) F => FieldsF_ c r
 instance GFieldsF c (G.Rep (r F)) F => FieldsF_ c r
@@ -1061,7 +1064,7 @@ instance GFieldsF c (G.Rep (r F)) F => FieldsF_ c r
 --
 -- This 'Constraint' ensures that @c@ is satsfieds by all of the 'G.K1' types
 -- appearing in @s@ that are wrapped by @f@.
-type family GFieldsF (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Constraint where
+type family GFieldsF (c :: k -> Constraint) (s :: ks -> Type) (f :: k -> Type) :: Constraint where
   GFieldsF _ G.V1 _ = ()
   GFieldsF _ G.U1 _ = ()
   GFieldsF c (G.K1 _ (f a)) f = (c a)
@@ -1070,9 +1073,9 @@ type family GFieldsF (c :: k -> Constraint) (s :: ks -> *) (f :: k -> *) :: Cons
   GFieldsF c (sl G.:*: sr) f = (GFieldsF c sl f, GFieldsF c sr f)
   GFieldsF c (sl G.:+: sr) f = (GFieldsF c sl f, GFieldsF c sr f)
 
--- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
+-- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> 'Type'@.
 data F (a :: k)
 
--- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> *@.
+-- | INTERNAL. DO NOT EXPORT. Used as a placeholder of kind @forall k. k -> 'Type'@.
 data G (a :: k)
 

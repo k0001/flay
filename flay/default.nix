@@ -1,4 +1,4 @@
-{ mkDerivation, base, constraints, stdenv, tasty, tasty-quickcheck
+{ mkDerivation, base, constraints, lib, tasty, tasty-quickcheck
 , transformers
 }:
 mkDerivation {
@@ -9,5 +9,5 @@ mkDerivation {
   testHaskellDepends = [ base tasty tasty-quickcheck transformers ];
   homepage = "https://github.com/k0001/flay";
   description = "Generic programming for higher-kinded types";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }
